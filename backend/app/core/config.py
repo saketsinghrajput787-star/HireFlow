@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     Reads values from environment variables or .env file.
     """
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "backend/.env", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")),
         env_file_encoding="utf-8",
         extra="ignore"
     )
