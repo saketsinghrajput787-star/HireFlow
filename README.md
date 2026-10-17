@@ -1,7 +1,7 @@
 # HireFlow — Applicant Tracking System (ATS)
-### Phase 1: Architecture Foundation, Database Schema & Role-Based Security
+### Phase 2: Complete Student Portal
 
-[![Backend Tests](https://img.shields.io/badge/pytest-8%20passed-brightgreen.svg)](file:///c:/Users/Saket/OneDrive/Desktop/HireFlow/backend/tests)
+[![Backend Tests](https://img.shields.io/badge/pytest-20%20passed-brightgreen.svg)](file:///c:/Users/Saket/OneDrive/Desktop/HireFlow/backend/tests)
 [![TypeScript Build](https://img.shields.io/badge/TypeScript-clean%20build-blue.svg)](file:///c:/Users/Saket/OneDrive/Desktop/HireFlow/frontend)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](file:///c:/Users/Saket/OneDrive/Desktop/HireFlow/backend)
 [![React](https://img.shields.io/badge/React-18.3+-61dafb.svg)](file:///c:/Users/Saket/OneDrive/Desktop/HireFlow/frontend)
@@ -15,16 +15,18 @@
 1. **Student Portal** — Students create rich candidate profiles, store verified PDF resumes in private cloud storage, discover open positions, apply, and track interview progress.
 2. **Recruiter Portal** — Authorized corporate recruiters manage job postings, review applicant pipelines, download candidate resumes, and coordinate interview stages.
 
-### Phase 1 Scope & Deliverables
-This release completes **Phase 1: Foundation, Database & Security**:
-- Hardened PostgreSQL relational schema (7 core tables) with automated user triggers and immutable audit logs.
-- Strict Row-Level Security (RLS) on all database tables and private storage objects.
-- Zero-trust authentication using Supabase Auth and authoritative role resolution (`student`, `recruiter`, `admin`).
-- High-performance FastAPI backend with token verification dependencies, OpenAPI documentation, and `/health` & `/api/me` endpoints.
-- Modern, accessible, responsive light-theme React + Vite + TypeScript frontend with role-guarded routes and separate student/recruiter access gateways.
-- Private resume bucket (`resumes`) with strict PDF MIME and 5MB size limits.
-- Automated unit and integration test suite with 100% pass rate.
-- Cloud deployment readiness for **Vercel** (frontend) and **Render** (backend).
+### Phase 2 Scope & Deliverables
+This release completes **Phase 2: Complete Student Portal**:
+- **Real-Time Student Dashboard**: Dynamic metrics backed by real database queries — calculated profile completion percentage, submitted application counters, stage breakdowns, upcoming interviews, and recent status updates.
+- **Rich Candidate Profile Builder**: Form management for personal info, graduation year, multi-entry education histories, professional experience timelines, and normalized interactive skill tag management.
+- **Private Resume Vault**: Secure PDF resume upload directly to the private Supabase `resumes` bucket (`{student_id}/resume.pdf`), time-limited signed URL download generation, replacement, deletion, and database synchronization.
+- **Live Job Discovery & Search**: Full-text keyword search across titles and descriptions, multi-parameter filters (work mode, employment type, experience level, location), pagination, and detailed job specification pages.
+- **Application Submission & Duplicate Prevention**: Backend student token verification, atomic application creation, and database-level duplicate prevention (`UNIQUE(job_id, student_id)`) returning HTTP 409 Conflict.
+- **Application Tracking & Hiring Stepper**: Dedicated application list and detail views with a visual progress stepper reflecting the authoritative stage (`Applied` &rarr; `Screening` &rarr; `Interview` &rarr; `Offer` &rarr; `Hired` or terminal `Rejected`).
+- **Interviews & Notifications Hub**: Scheduled interview coordinates with meeting links, automatic audit and status change notifications, and mark-as-read functionality.
+- **Additive Database Migration 004**: Adds `phone` to `candidate_profiles`, automated audit logging triggers, and application notification triggers.
+- **Repeatable Development Job Seed Script**: Safe `seed_jobs.sql` script populating 6 fictional job openings linked to an authorized recruiter.
+- **Automated Test Suite**: 20 backend unit/integration tests with 100% pass rate.
 
 ---
 
@@ -208,26 +210,45 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'recruiter@company.com');
 ```
 3. The recruiter can now sign in at **`/recruiter/login`**.
 
+## 7. Phase 2 API Endpoints
+
+### Student Portal & Jobs API
+
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/student/dashboard-stats` | Student | Profile completion %, app counts, interviews, recent updates |
+| `GET` | `/api/student/profile` | Student | Candidate profile details (education, experience, skills, resume) |
+| `PATCH`| `/api/student/profile` | Student | Updates candidate profile details |
+| `PATCH`| `/api/student/profile/resume` | Student | Records uploaded resume path in candidate profile |
+| `DELETE`| `/api/student/profile/resume` | Student | Removes resume path from candidate profile |
+| `GET` | `/api/jobs` | Public / Student | Discovers open published jobs with search & filters |
+| `GET` | `/api/jobs/{id}` | Public / Student | Full job specification and application status |
+| `POST`| `/api/jobs/{id}/apply` | Student | Submits job application with duplicate prevention |
+| `GET` | `/api/student/applications` | Student | Lists student's submitted applications |
+| `GET` | `/api/student/applications/{id}`| Student | Detailed application progress, stage stepper, logs |
+| `GET` | `/api/student/interviews` | Student | Scheduled interview coordinates and meeting links |
+| `GET` | `/api/student/notifications` | Student | Lists application and interview notifications |
+| `PATCH`| `/api/student/notifications/{id}/read` | Student | Marks notification as read |
+
 ---
 
-## 7. Verification & Test Results
+## 8. Verification & Test Results
 
 | Test Category | Command | Result | Notes |
 | :--- | :--- | :--- | :--- |
-| **Backend Pytest** | `pytest backend/tests -v` | **8 passed** (100%) | Health, Missing Token, Invalid Token, Student Role, Recruiter RBAC |
+| **Backend Pytest** | `pytest backend/tests -v` | **20 passed** (100%) | Auth, Health, Jobs discovery, Applications, Duplicates, Isolation, Profile lifecycle, Resume metadata, Notifications, Interviews |
 | **Live Health Check** | `GET /health` | **HTTP 200** | Live FastAPI server validated |
 | **Live Auth Gate** | `GET /api/me` | **HTTP 401** | Correctly rejects unauthenticated requests |
-| **TypeScript Build** | `npm run build` | **0 errors** | 1,662 modules transformed, clean production bundle |
-| **Browser E2E** | Chrome Subagent | **All routes verified** | Visual inspection, accessible forms, zero console errors |
+| **TypeScript Build** | `npm run build` | **0 errors** | 1,674 modules transformed, clean production bundle |
+| **Browser E2E** | Chrome Subagent | **All routes verified** | Real database queries, accessible forms, zero console errors |
 
 ---
 
-## 8. Known Limitations & Phase 2 Roadmap
+## 9. Phase 3 Roadmap (Recruiter Portal)
 
-The following modules are deliberately scheduled for **Phase 2**:
-- [ ] Student Profile Editing: Interactive forms for education, skills, and work experience.
-- [ ] PDF Resume Upload: Multipart upload directly to the private `resumes` bucket with client & server-side validation.
-- [ ] Job Management CRUD: Recruiter dashboard interface to publish, edit, and archive job postings.
-- [ ] Application Submission & Tracking: 1-click student applications with duplicate prevention.
-- [ ] Recruiter Pipeline Kanban: Drag-and-drop applicant status changes (`applied` &rarr; `screening` &rarr; `interview` &rarr; `offer`).
-- [ ] Interview Coordination Calendar: Meeting link generation and recruiter feedback logging.
+The following modules are scheduled for **Phase 3: Recruiter Portal**:
+- [ ] Recruiter Job Management CRUD: Create, publish, edit, close, and archive job postings.
+- [ ] Applicant Pipeline Kanban: Drag-and-drop applicant cards across hiring stages (`applied` &rarr; `screening` &rarr; `interview` &rarr; `offer` &rarr; `hired`).
+- [ ] Resume Review Vault: In-browser PDF resume viewer and secure authorized download for recruiters.
+- [ ] Interview Coordination: Schedule interviews, assign meeting links, and submit recruiter feedback.
+- [ ] Candidate Status Communication: Automated notifications and email updates on stage changes.

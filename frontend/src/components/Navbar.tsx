@@ -1,18 +1,42 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { RoleBadge } from './RoleBadge';
-import { Briefcase, LogOut, Menu, X, User, Shield } from 'lucide-react';
+import { api } from '../services/api';
+import {
+  Briefcase,
+  LogOut,
+  Menu,
+  X,
+  User,
+  Shield,
+  Bell,
+} from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { session, profile, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (session?.access_token && profile?.role === 'student') {
+      api
+        .getStudentNotifications(session.access_token)
+        .then((items) => {
+          setUnreadCount(items.filter((n) => !n.read_at).length);
+        })
+        .catch(() => {});
+    }
+  }, [session, profile, location.pathname]);
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
   };
+
+  const isStudent = profile?.role === 'student';
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200">
@@ -28,21 +52,88 @@ export const Navbar: React.FC = () => {
                 HireFlow
               </span>
               <span className="hidden sm:inline-block ml-2 text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
-                Phase 1 ATS
+                ATS
               </span>
             </div>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-4">
+          <nav className="hidden md:flex items-center gap-5">
             {session && profile ? (
-              <div className="flex items-center gap-4">
-                <Link
-                  to={profile.role === 'recruiter' ? '/recruiter/dashboard' : '/student/dashboard'}
-                  className="text-sm font-medium text-slate-700 hover:text-indigo-600 transition-colors"
-                >
-                  Dashboard
-                </Link>
+              <div className="flex items-center gap-5">
+                {isStudent ? (
+                  <>
+                    <Link
+                      to="/student/dashboard"
+                      className={`text-sm font-medium transition-colors ${
+                        location.pathname === '/student/dashboard'
+                          ? 'text-indigo-600 font-bold'
+                          : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      Dashboard
+                    </Link>
+                    <Link
+                      to="/student/jobs"
+                      className={`text-sm font-medium transition-colors ${
+                        location.pathname.startsWith('/student/jobs')
+                          ? 'text-indigo-600 font-bold'
+                          : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      Browse Jobs
+                    </Link>
+                    <Link
+                      to="/student/applications"
+                      className={`text-sm font-medium transition-colors ${
+                        location.pathname.startsWith('/student/applications')
+                          ? 'text-indigo-600 font-bold'
+                          : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      My Applications
+                    </Link>
+                    <Link
+                      to="/student/interviews"
+                      className={`text-sm font-medium transition-colors ${
+                        location.pathname === '/student/interviews'
+                          ? 'text-indigo-600 font-bold'
+                          : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      Interviews
+                    </Link>
+                    <Link
+                      to="/student/profile"
+                      className={`text-sm font-medium transition-colors ${
+                        location.pathname === '/student/profile'
+                          ? 'text-indigo-600 font-bold'
+                          : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      Profile
+                    </Link>
+
+                    {/* Notification Bell */}
+                    <Link
+                      to="/student/notifications"
+                      className="relative p-2 text-slate-500 hover:text-indigo-600 rounded-lg hover:bg-slate-100 transition-colors"
+                      title="Notifications"
+                    >
+                      <Bell className="w-4 h-4" />
+                      {unreadCount > 0 && (
+                        <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white animate-pulse" />
+                      )}
+                    </Link>
+                  </>
+                ) : (
+                  <Link
+                    to="/recruiter/dashboard"
+                    className="text-sm font-medium text-slate-700 hover:text-indigo-600 transition-colors"
+                  >
+                    Recruiter Dashboard
+                  </Link>
+                )}
 
                 <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
                   <div className="flex flex-col items-end">
@@ -54,7 +145,7 @@ export const Navbar: React.FC = () => {
                   <RoleBadge role={profile.role} />
                   <button
                     onClick={handleSignOut}
-                    className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                     title="Sign Out"
                     aria-label="Sign Out"
                   >
@@ -117,22 +208,73 @@ export const Navbar: React.FC = () => {
                 </div>
                 <RoleBadge role={profile.role} />
               </div>
-              <Link
-                to={profile.role === 'recruiter' ? '/recruiter/dashboard' : '/student/dashboard'}
-                onClick={() => setMobileMenuOpen(false)}
-                className="block text-sm font-medium text-indigo-600 hover:text-indigo-800 py-1"
-              >
-                Go to Dashboard
-              </Link>
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleSignOut();
-                }}
-                className="w-full text-left text-sm font-medium text-rose-600 hover:text-rose-700 py-1"
-              >
-                Sign Out
-              </button>
+
+              {isStudent ? (
+                <div className="space-y-1">
+                  <Link
+                    to="/student/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-sm font-medium text-slate-700 hover:text-indigo-600 py-1.5"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    to="/student/jobs"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-sm font-medium text-slate-700 hover:text-indigo-600 py-1.5"
+                  >
+                    Browse Jobs
+                  </Link>
+                  <Link
+                    to="/student/applications"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-sm font-medium text-slate-700 hover:text-indigo-600 py-1.5"
+                  >
+                    My Applications
+                  </Link>
+                  <Link
+                    to="/student/interviews"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-sm font-medium text-slate-700 hover:text-indigo-600 py-1.5"
+                  >
+                    Interviews
+                  </Link>
+                  <Link
+                    to="/student/profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-sm font-medium text-slate-700 hover:text-indigo-600 py-1.5"
+                  >
+                    Candidate Profile
+                  </Link>
+                  <Link
+                    to="/student/notifications"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-sm font-medium text-slate-700 hover:text-indigo-600 py-1.5"
+                  >
+                    Notifications {unreadCount > 0 && `(${unreadCount} unread)`}
+                  </Link>
+                </div>
+              ) : (
+                <Link
+                  to="/recruiter/dashboard"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block text-sm font-medium text-indigo-600 hover:text-indigo-800 py-1"
+                >
+                  Recruiter Dashboard
+                </Link>
+              )}
+
+              <div className="pt-2 border-t border-slate-100">
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleSignOut();
+                  }}
+                  className="w-full text-left text-sm font-medium text-rose-600 hover:text-rose-700 py-1"
+                >
+                  Sign Out
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-2 pt-2">

@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.core.security import logger, AuthError
-from app.api.routes import health, auth
+from app.api.routes import health, auth, student, jobs
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -46,6 +46,8 @@ async def generic_exception_handler(request: Request, exc: Exception):
 # Register routers
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(student.router)
+app.include_router(jobs.router)
 
 
 @app.get("/", include_in_schema=False)

@@ -4,6 +4,7 @@ import { AuthProvider } from './hooks/useAuth';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RootLayout } from './layouts/RootLayout';
 import { DashboardLayout } from './layouts/DashboardLayout';
+import { StudentPortalLayout } from './layouts/StudentPortalLayout';
 
 import { LandingPage } from './pages/LandingPage';
 import { StudentLoginPage } from './pages/auth/StudentLoginPage';
@@ -11,6 +12,13 @@ import { StudentSignupPage } from './pages/auth/StudentSignupPage';
 import { RecruiterLoginPage } from './pages/auth/RecruiterLoginPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { StudentDashboardPage } from './pages/student/StudentDashboardPage';
+import { StudentProfilePage } from './pages/student/StudentProfilePage';
+import { JobDiscoveryPage } from './pages/student/JobDiscoveryPage';
+import { JobDetailPage } from './pages/student/JobDetailPage';
+import { StudentApplicationsPage } from './pages/student/StudentApplicationsPage';
+import { StudentApplicationDetailPage } from './pages/student/StudentApplicationDetailPage';
+import { StudentInterviewsPage } from './pages/student/StudentInterviewsPage';
+import { StudentNotificationsPage } from './pages/student/StudentNotificationsPage';
 import { RecruiterDashboardPage } from './pages/recruiter/RecruiterDashboardPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -29,14 +37,21 @@ export const App: React.FC = () => {
 
             {/* Protected Student Route Group */}
             <Route
-              path="student/dashboard"
+              path="student"
               element={
                 <ProtectedRoute allowedRoles={['student', 'admin']}>
-                  <DashboardLayout />
+                  <StudentPortalLayout />
                 </ProtectedRoute>
               }
             >
-              <Route index element={<StudentDashboardPage />} />
+              <Route path="dashboard" element={<StudentDashboardPage />} />
+              <Route path="profile" element={<StudentProfilePage />} />
+              <Route path="jobs" element={<JobDiscoveryPage />} />
+              <Route path="jobs/:id" element={<JobDetailPage />} />
+              <Route path="applications" element={<StudentApplicationsPage />} />
+              <Route path="applications/:id" element={<StudentApplicationDetailPage />} />
+              <Route path="interviews" element={<StudentInterviewsPage />} />
+              <Route path="notifications" element={<StudentNotificationsPage />} />
             </Route>
 
             {/* Protected Recruiter Route Group */}

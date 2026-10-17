@@ -32,6 +32,26 @@ async def get_current_user(
     return profile
 
 
+async def get_optional_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
+    auth_service: SupabaseAuthService = Depends(get_auth_service)
+) -> Optional[UserProfileResponse]:
+    """
+    Extracts Bearer token if present; returns None if not provided or invalid.
+    Allows endpoints like job browsing to work for unauthenticated visitors or students.
+    """
+    if credentials is None or not credentials.credentials:
+        return None
+    try:
+        token = credentials.credentials
+        user_payload = await auth_service.verify_token_and_get_user(token)
+        user_id = user_payload.get("id")
+        email = user_payload.get("email") or ""
+        return await auth_service.get_authoritative_profile(user_id, email)
+    except Exception:
+        return None
+
+
 def require_role(allowed_roles: List[UserRole]):
     """
     Role-based access control dependency factory.

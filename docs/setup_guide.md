@@ -34,6 +34,14 @@ Open **SQL Editor** in your Supabase Dashboard and run the migration scripts in 
 3. Copy and execute [003_storage.sql](../database/migrations/003_storage.sql):
    - Configures the private storage bucket `resumes` (5MB limit, PDF MIME only).
    - Establishes storage RLS policies for students and authorized recruiters.
+4. Copy and execute [004_student_portal_enhancements.sql](../database/migrations/004_student_portal_enhancements.sql):
+   - Adds `phone` column to `candidate_profiles` table.
+   - Adds automated audit trigger `log_new_application` on `applications` table.
+   - Adds automated status change notification trigger `log_application_stage_change` notifying candidate on stage updates.
+5. (Optional Development Data) Run [seed_jobs.sql](../database/seed_jobs.sql):
+   - Safely provisions 6 realistic open job postings.
+   - Automatically links postings to an authorized recruiter (or guides provisioning one first).
+   - Uses `ON CONFLICT DO NOTHING` to ensure safe, repeatable execution.
 
 ### B. Configure Authentication Settings
 In the Supabase Dashboard, navigate to **Authentication -> URL Configuration**:
