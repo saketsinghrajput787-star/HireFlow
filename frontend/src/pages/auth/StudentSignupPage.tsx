@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Alert } from '../../components/Alert';
+import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { GraduationCap, ArrowRight, Loader2, Lock, Mail, User, ShieldCheck } from 'lucide-react';
 
 export const StudentSignupPage: React.FC = () => {
@@ -12,9 +13,46 @@ export const StudentSignupPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [signupSuccess, setSignupSuccess] = useState(false);
+  const [confirmationRequired, setConfirmationRequired] = useState(false);
 
-  const { signUpStudent, session, error, clearError } = useAuth();
+  const { signUpStudent, session, profile, loading, error, clearError } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Route isolation: Ensure redirect strictly stays within the student portal
+  const rawFrom = (location.state as any)?.from?.pathname;
+  const targetPath =
+    rawFrom &&
+    rawFrom.startsWith('/student') &&
+    !rawFrom.includes('/login') &&
+    !rawFrom.includes('/signup')
+      ? rawFrom
+      : '/student/dashboard';
+
+  // Automatically redirect authenticated students directly to their dashboard
+  useEffect(() => {
+    if (loading) return;
+    if (session && profile) {
+      if (profile.role === 'student' || profile.role === 'admin') {
+        navigate(targetPath, { replace: true });
+      } else if (profile.role === 'recruiter') {
+        navigate('/recruiter/dashboard', { replace: true });
+      }
+    }
+  }, [session, profile, loading, targetPath, navigate]);
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center px-4 py-12">
+        <LoadingSpinner size="lg" message="Checking authentication session..." />
+      </div>
+    );
+  }
+
+  // Prevent UI flash when authenticated student is navigating away
+  if (session && profile) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,11 +76,20 @@ export const StudentSignupPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      await signUpStudent(email, password, fullName.trim());
-      setSignupSuccess(true);
-      setTimeout(() => {
-        navigate(session ? '/student/dashboard' : '/student/login');
-      }, 1500);
+      const result = await signUpStudent(email, password, fullName.trim());
+
+      if (result.session && result.profile) {
+        setSignupSuccess(true);
+        navigate(targetPath, { replace: true });
+        return;
+      }
+
+      if (result.requiresConfirmation) {
+        setConfirmationRequired(true);
+        return;
+      }
+
+      setLocalError('Unable to establish a student session. Please try signing in.');
     } catch (err: any) {
       setLocalError(err.message || 'Failed to create student account.');
     } finally {
@@ -83,117 +130,135 @@ export const StudentSignupPage: React.FC = () => {
           />
         )}
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-4" noValidate>
-          <div>
-            <label htmlFor="student-name" className="block text-sm font-medium text-slate-700">
-              Full Name
-            </label>
-            <div className="mt-1 relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <User className="w-4 h-4" />
-              </div>
-              <input
-                id="student-name"
-                type="text"
-                autoComplete="name"
-                required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Jane Doe"
-                className="block w-full pl-10 pr-3 py-2.5 text-sm border border-slate-300 rounded-lg input-focus-ring bg-white"
-              />
+        {confirmationRequired ? (
+          <div className="space-y-6 pt-2">
+            <Alert
+              type="info"
+              title="Verification Email Sent"
+              message={`Your student account has been created. A confirmation email has been sent to ${email}. Please check your inbox and verify your email to activate your account.`}
+            />
+            <div className="text-center pt-2">
+              <Link
+                to="/student/login"
+                className="inline-flex items-center justify-center gap-2 py-2.5 px-6 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm"
+              >
+                Proceed to Sign In <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
           </div>
-
-          <div>
-            <label htmlFor="signup-email" className="block text-sm font-medium text-slate-700">
-              Email Address
-            </label>
-            <div className="mt-1 relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Mail className="w-4 h-4" />
+        ) : (
+          <form onSubmit={handleSubmit} className="mt-8 space-y-4" noValidate>
+            <div>
+              <label htmlFor="student-name" className="block text-sm font-medium text-slate-700">
+                Full Name
+              </label>
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <User className="w-4 h-4" />
+                </div>
+                <input
+                  id="student-name"
+                  type="text"
+                  autoComplete="name"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Jane Doe"
+                  className="block w-full pl-10 pr-3 py-2.5 text-sm border border-slate-300 rounded-lg input-focus-ring bg-white"
+                />
               </div>
-              <input
-                id="signup-email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="jane@university.edu"
-                className="block w-full pl-10 pr-3 py-2.5 text-sm border border-slate-300 rounded-lg input-focus-ring bg-white"
-              />
             </div>
-          </div>
 
-          <div>
-            <label htmlFor="signup-password" className="block text-sm font-medium text-slate-700">
-              Password (min. 8 characters)
-            </label>
-            <div className="mt-1 relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Lock className="w-4 h-4" />
+            <div>
+              <label htmlFor="signup-email" className="block text-sm font-medium text-slate-700">
+                Email Address
+              </label>
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <input
+                  id="signup-email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="jane@university.edu"
+                  className="block w-full pl-10 pr-3 py-2.5 text-sm border border-slate-300 rounded-lg input-focus-ring bg-white"
+                />
               </div>
-              <input
-                id="signup-password"
-                type="password"
-                autoComplete="new-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
-                className="block w-full pl-10 pr-3 py-2.5 text-sm border border-slate-300 rounded-lg input-focus-ring bg-white"
-              />
             </div>
-          </div>
 
-          <div>
-            <label htmlFor="confirm-password" className="block text-sm font-medium text-slate-700">
-              Confirm Password
-            </label>
-            <div className="mt-1 relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Lock className="w-4 h-4" />
+            <div>
+              <label htmlFor="signup-password" className="block text-sm font-medium text-slate-700">
+                Password (min. 8 characters)
+              </label>
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  id="signup-password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
+                  className="block w-full pl-10 pr-3 py-2.5 text-sm border border-slate-300 rounded-lg input-focus-ring bg-white"
+                />
               </div>
-              <input
-                id="confirm-password"
-                type="password"
-                autoComplete="new-password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
-                className="block w-full pl-10 pr-3 py-2.5 text-sm border border-slate-300 rounded-lg input-focus-ring bg-white"
-              />
             </div>
-          </div>
 
-          {/* Security Notice: Role Constraint */}
-          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs text-slate-500 flex items-start gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-            <span>
-              Public registration assigns verified Student permissions only. Recruiter accounts are
-              managed exclusively by system administrators.
-            </span>
-          </div>
+            <div>
+              <label htmlFor="confirm-password" className="block text-sm font-medium text-slate-700">
+                Confirm Password
+              </label>
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  id="confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
+                  className="block w-full pl-10 pr-3 py-2.5 text-sm border border-slate-300 rounded-lg input-focus-ring bg-white"
+                />
+              </div>
+            </div>
 
-          <button
-            type="submit"
-            disabled={submitting || signupSuccess}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Creating Student Account...
-              </>
-            ) : (
-              <>
-                Complete Registration <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-        </form>
+            {/* Security Notice: Role Constraint */}
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs text-slate-500 flex items-start gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <span>
+                Public registration assigns verified Student permissions only. Recruiter accounts are
+                managed exclusively by system administrators.
+              </span>
+            </div>
+
+            <button
+              type="submit"
+              disabled={submitting || signupSuccess}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Creating Student Account...
+                </>
+              ) : (
+                <>
+                  Complete Registration <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+        )}
 
         <div className="mt-6 pt-6 border-t border-slate-100 text-center text-sm text-slate-600">
           Already have an account?{' '}

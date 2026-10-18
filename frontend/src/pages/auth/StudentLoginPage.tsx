@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Alert } from '../../components/Alert';
@@ -10,7 +10,7 @@ export const StudentLoginPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const { signInStudent, error, clearError, session, profile, signOut } = useAuth();
+  const { signInStudent, error, clearError, session, profile, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -23,6 +23,14 @@ export const StudentLoginPage: React.FC = () => {
     !rawFrom.includes('/signup')
       ? rawFrom
       : '/student/dashboard';
+
+  // Automatically redirect authenticated students directly to their dashboard
+  useEffect(() => {
+    if (loading) return;
+    if (session && profile && (profile.role === 'student' || profile.role === 'admin')) {
+      navigate(targetPath, { replace: true });
+    }
+  }, [session, profile, loading, targetPath, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

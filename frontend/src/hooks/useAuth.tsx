@@ -3,6 +3,13 @@ import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { api } from '../services/api';
 import { UserProfile } from '../types';
 
+export interface SignUpResult {
+  session: any | null;
+  user: any | null;
+  profile: UserProfile | null;
+  requiresConfirmation: boolean;
+}
+
 interface AuthContextType {
   user: any | null;
   profile: UserProfile | null;
@@ -10,7 +17,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   signInStudent: (email: string, password: string) => Promise<void>;
-  signUpStudent: (email: string, password: string, fullName: string) => Promise<void>;
+  signUpStudent: (email: string, password: string, fullName: string) => Promise<SignUpResult>;
   signInRecruiter: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -34,7 +41,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
    * 1. FastAPI backend /api/me (cryptographic token verification and service-role database lookup)
    * 2. Direct Supabase database query (if backend is offline/unreachable; permitted under RLS profiles_select_own)
    */
-  const loadAuthoritativeProfile = async (accessToken: string, currentUser: any): Promise<UserProfile> => {
+  const loadAuthoritativeProfile = async (
+    accessToken: string,
+    currentUser: any,
+    retryCount: number = 1
+  ): Promise<UserProfile> => {
     // 1. Try FastAPI backend /api/me
     try {
       const authProfile = await api.getMe(accessToken);
@@ -44,16 +55,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setProfile(authProfile);
       return authProfile;
     } catch (backendErr: any) {
-      // If the backend explicitly reports profile missing (404), propagate immediately
-      if (backendErr.status === 404) {
-        throw backendErr;
-      }
-      // If token is invalid or expired (401), propagate immediately
       if (backendErr.status === 401) {
         throw backendErr;
       }
 
-      console.warn('Backend /api/me unavailable, attempting direct Supabase profile resolution:', backendErr.message);
+      // If backend reports 404 and retries remain, retry after brief delay to allow database trigger completion
+      if (backendErr.status === 404 && retryCount > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        return loadAuthoritativeProfile(accessToken, currentUser, retryCount - 1);
+      }
+
+      console.warn('Backend /api/me unavailable or returned error, attempting direct Supabase profile resolution:', backendErr.message);
 
       // 2. Direct Supabase query fallback for offline/unreachable backend
       try {
@@ -69,6 +81,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         if (!profileRow) {
+          if (retryCount > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            return loadAuthoritativeProfile(accessToken, currentUser, retryCount - 1);
+          }
           const notFoundError: any = new Error(
             'Profile Record Missing: Your account exists in authentication, but no record was found in public.profiles. Please contact the administrator to initialize your profile record.'
           );
@@ -276,7 +292,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
    * Student Public Signup
    * Security Rule: Public signup strictly registers accounts with role 'student'.
    */
-  const signUpStudent = async (email: string, password: string, fullName: string) => {
+  const signUpStudent = async (email: string, password: string, fullName: string): Promise<SignUpResult> => {
     setError(null);
     setLoading(true);
     isAuthenticatingRef.current = true;
@@ -299,11 +315,55 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (signUpError) throw signUpError;
 
+      if (!data.user) {
+        throw new Error('No user data returned from registration service.');
+      }
+
+      // Check if Supabase returned a dummy user for already-registered email
+      if (Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        throw new Error('An account with this email address already exists. Please sign in or reset your password.');
+      }
+
       if (data.session && data.user) {
         setSession(data.session);
         setUser(data.user);
-        await loadAuthoritativeProfile(data.session.access_token, data.user);
+        let resolvedProfile: UserProfile;
+        try {
+          resolvedProfile = await loadAuthoritativeProfile(data.session.access_token, data.user);
+        } catch (profileErr: any) {
+          console.warn('Profile load after student signup warning:', profileErr);
+          throw new Error(
+            profileErr.message || 'Account created, but student profile record could not be loaded. Please try signing in.'
+          );
+        }
+
+        // Strict role validation
+        if (resolvedProfile.role !== 'student' && resolvedProfile.role !== 'admin') {
+          await supabase.auth.signOut();
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          throw new Error('Access denied: account created is not authorized as a student.');
+        }
+
+        return {
+          session: data.session,
+          user: data.user,
+          profile: resolvedProfile,
+          requiresConfirmation: false,
+        };
       }
+
+      // Email confirmation required or session not established
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      return {
+        session: null,
+        user: data.user,
+        profile: null,
+        requiresConfirmation: true,
+      };
     } catch (err: any) {
       setError(err.message || 'Failed to create student account');
       throw err;

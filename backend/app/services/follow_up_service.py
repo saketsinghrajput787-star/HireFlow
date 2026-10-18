@@ -88,7 +88,7 @@ class FollowUpService:
         # 2. Fetch all applications for these jobs
         job_ids_filter = f"in.({','.join(job_ids)})"
         apps_res = await client.get(
-            f"{base_url}/rest/v1/applications?job_id={job_ids_filter}&select=id,job_id,student_id,stage,applied_at,stage_changed_at,profiles(full_name,email)",
+            f"{base_url}/rest/v1/applications?job_id={job_ids_filter}&select=id,job_id,student_id,stage,applied_at,stage_changed_at,profiles(full_name)",
             headers=headers
         )
         if apps_res.status_code != 200:

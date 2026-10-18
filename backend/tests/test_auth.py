@@ -249,8 +249,34 @@ def test_student_endpoints_rejected_for_recruiter():
         response = client.get("/api/student/profile", headers={"Authorization": "Bearer recruiter-token"})
         assert response.status_code == 403
         assert "Access denied" in response.json()["detail"]
+
+        response_stats = client.get("/api/student/dashboard-stats", headers={"Authorization": "Bearer recruiter-token"})
+        assert response_stats.status_code == 403
+
+        response_apps = client.get("/api/student/applications", headers={"Authorization": "Bearer recruiter-token"})
+        assert response_apps.status_code == 403
     finally:
         app.dependency_overrides.clear()
+
+
+def test_recruiter_endpoints_rejected_for_student():
+    """
+    Endpoints under /api/recruiter/* must strictly reject users with student role with 403 Forbidden.
+    """
+    app.dependency_overrides[get_auth_service] = lambda: MockAuthService(mock_role="student")
+    try:
+        response_jobs = client.get("/api/recruiter/jobs", headers={"Authorization": "Bearer student-token"})
+        assert response_jobs.status_code == 403
+        assert "Access denied" in response_jobs.json()["detail"]
+
+        response_stats = client.get("/api/recruiter/dashboard", headers={"Authorization": "Bearer student-token"})
+        assert response_stats.status_code == 403
+
+        response_applicants = client.get("/api/recruiter/applications", headers={"Authorization": "Bearer student-token"})
+        assert response_applicants.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
 
 
 

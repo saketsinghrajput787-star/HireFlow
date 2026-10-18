@@ -367,6 +367,19 @@ class RecruiterService:
                 aid = item.get("application_id")
                 int_counts[aid] = int_counts.get(aid, 0) + 1
 
+        # Step 4b: Fetch candidate emails via auth admin
+        email_map: Dict[str, str] = {}
+        for sid in student_ids:
+            try:
+                auth_res = await client.get(
+                    f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/admin/users/{sid}",
+                    headers=headers,
+                )
+                if auth_res.status_code == 200:
+                    email_map[sid] = auth_res.json().get("email") or ""
+            except Exception:
+                pass
+
         results: List[RecruiterApplicantSummary] = []
         search_lower = search.strip().lower() if search else None
 
@@ -412,7 +425,7 @@ class RecruiterService:
                 job_company=job_info.get("company", "Company"),
                 student_id=sid,
                 student_name=student_name,
-                student_email=cand_info.get("phone") or "",  # Fallback contact info
+                student_email=email_map.get(sid) or cand_info.get("phone") or "",
                 stage=app["stage"],
                 applied_at=app["applied_at"],
                 stage_changed_at=app["stage_changed_at"],
