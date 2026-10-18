@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     # Supabase Settings
     SUPABASE_URL: str = Field(default="https://placeholder.supabase.co", description="Supabase project URL")
     SUPABASE_PUBLISHABLE_KEY: str = Field(default="placeholder-publishable-key", description="Supabase anon/publishable key")
+    SUPABASE_ANON_KEY: Optional[str] = Field(default=None, description="Optional alias for anon key")
     SUPABASE_SERVICE_ROLE_KEY: str = Field(default="placeholder-service-key", description="Supabase service role secret key (backend only)")
 
     # CORS configuration: comma-separated list of allowed origins

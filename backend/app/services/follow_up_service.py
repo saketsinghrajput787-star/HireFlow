@@ -37,9 +37,10 @@ class FollowUpService:
         return self._client
 
     def _get_headers(self) -> Dict[str, str]:
+        key = settings.SUPABASE_SERVICE_ROLE_KEY if "placeholder" not in settings.SUPABASE_SERVICE_ROLE_KEY else (settings.SUPABASE_ANON_KEY or settings.SUPABASE_PUBLISHABLE_KEY)
         return {
-            "apikey": settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_ANON_KEY,
-            "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_ANON_KEY}",
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
             "Prefer": "return=representation",
         }
