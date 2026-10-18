@@ -10,6 +10,7 @@ import { CandidateProfile, EducationItem, ExperienceItem } from '../../types';
 import { SkillsInput } from '../../components/SkillsInput';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Alert } from '../../components/Alert';
+import { Link } from 'react-router-dom';
 import {
   User,
   GraduationCap,
@@ -25,6 +26,7 @@ import {
   Phone,
   Mail,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 
 export const StudentProfilePage: React.FC = () => {
@@ -391,7 +393,15 @@ export const StudentProfilePage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  to="/student/resume-analysis"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Analyze Resume
+                </Link>
+
                 <button
                   type="button"
                   onClick={handleDownloadResume}

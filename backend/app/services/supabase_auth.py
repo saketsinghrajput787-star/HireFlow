@@ -95,24 +95,29 @@ class SupabaseAuthService:
                         role=role_val,
                         created_at=profile_data.get("created_at")
                     )
-
-            logger.warning("No authoritative profile found for user %s; defaulting to student.", user_id)
-            return UserProfileResponse(
-                id=user_id,
-                email=email,
-                full_name=email.split("@")[0],
-                role="student",
-                created_at=None
-            )
+                else:
+                    logger.error("No profile record found in public.profiles for authenticated user %s", user_id)
+                    raise AuthError(
+                        "User profile record not found in database. Please contact the administrator to initialize your profile.",
+                        status.HTTP_404_NOT_FOUND
+                    )
+            elif response.status_code == 404:
+                raise AuthError(
+                    "User profile record not found in database. Please contact the administrator.",
+                    status.HTTP_404_NOT_FOUND
+                )
+            else:
+                logger.error("Failed to query profile: status=%d text=%s", response.status_code, response.text)
+                raise AuthError(
+                    "Database error while retrieving user profile.",
+                    status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
         except httpx.RequestError as exc:
             logger.error("Error querying authoritative profile for user %s: %s", user_id, str(exc))
-            return UserProfileResponse(
-                id=user_id,
-                email=email,
-                full_name=email.split("@")[0],
-                role="student",
-                created_at=None
+            raise AuthError(
+                "Unable to reach database service to retrieve user profile.",
+                status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
 

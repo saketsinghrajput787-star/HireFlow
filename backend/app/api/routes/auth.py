@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.api.deps import get_current_user, require_recruiter
+from app.api.deps import get_current_user, require_recruiter, require_student
 from app.schemas.auth import UserProfileResponse
 
 router = APIRouter(prefix="/api", tags=["Authentication & Profile"])
@@ -33,3 +33,19 @@ async def check_recruiter_access(
     Protected route used to verify recruiter authorization on the backend.
     """
     return current_user
+
+
+@router.get(
+    "/student-check",
+    response_model=UserProfileResponse,
+    summary="Verify Student Authorization",
+    description="Requires an authorized student or admin role; returns 403 Forbidden for recruiters."
+)
+async def check_student_access(
+    current_user: UserProfileResponse = Depends(require_student)
+) -> UserProfileResponse:
+    """
+    Protected route used to verify student authorization on the backend.
+    """
+    return current_user
+

@@ -1,41 +1,90 @@
-# HireFlow — Applicant Tracking System (ATS)
-### Phase 2: Complete Student Portal
+# HireFlow — Modern Applicant Tracking System (ATS)
+### Enterprise Talent Acquisition Platform with Smart Matching, Resume Intelligence & Follow-up Automation
 
-[![Backend Tests](https://img.shields.io/badge/pytest-20%20passed-brightgreen.svg)](file:///c:/Users/Saket/OneDrive/Desktop/HireFlow/backend/tests)
-[![TypeScript Build](https://img.shields.io/badge/TypeScript-clean%20build-blue.svg)](file:///c:/Users/Saket/OneDrive/Desktop/HireFlow/frontend)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](file:///c:/Users/Saket/OneDrive/Desktop/HireFlow/backend)
-[![React](https://img.shields.io/badge/React-18.3+-61dafb.svg)](file:///c:/Users/Saket/OneDrive/Desktop/HireFlow/frontend)
-[![PostgreSQL RLS](https://img.shields.io/badge/PostgreSQL-RLS%20Hardened-336791.svg)](file:///c:/Users/Saket/OneDrive/Desktop/HireFlow/database/migrations)
+[![Backend Tests](https://img.shields.io/badge/pytest-66%20passed-brightgreen.svg)](backend/tests)
+[![TypeScript Build](https://img.shields.io/badge/TypeScript-clean%20build-blue.svg)](frontend)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](backend)
+[![React](https://img.shields.io/badge/React-18.3+-61dafb.svg)](frontend)
+[![Vite](https://img.shields.io/badge/Vite-6.4+-646CFF.svg)](frontend)
+[![PostgreSQL RLS](https://img.shields.io/badge/PostgreSQL-RLS%20Hardened-336791.svg)](database/migrations)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](backend)
 
 ---
 
 ## 1. Project Overview
 
-**HireFlow** is a modern, enterprise-ready full-stack Applicant Tracking System (ATS) connecting student talent with recruiters. HireFlow is designed around two distinct portals:
-1. **Student Portal** — Students create rich candidate profiles, store verified PDF resumes in private cloud storage, discover open positions, apply, and track interview progress.
-2. **Recruiter Portal** — Authorized corporate recruiters manage job postings, review applicant pipelines, download candidate resumes, and coordinate interview stages.
+**HireFlow** is a modern, enterprise-grade Applicant Tracking System (ATS) engineered to connect student talent with corporate hiring teams. Designed around strict security isolation, privacy-first resume parsing, and deterministic candidate-job matching, HireFlow empowers candidates to discover opportunities and tailor their resumes while enabling recruiters to manage hiring pipelines with automated follow-ups and transparent scorecards.
 
-### Phase 2 Scope & Deliverables
-This release completes **Phase 2: Complete Student Portal**:
-- **Real-Time Student Dashboard**: Dynamic metrics backed by real database queries — calculated profile completion percentage, submitted application counters, stage breakdowns, upcoming interviews, and recent status updates.
-- **Rich Candidate Profile Builder**: Form management for personal info, graduation year, multi-entry education histories, professional experience timelines, and normalized interactive skill tag management.
-- **Private Resume Vault**: Secure PDF resume upload directly to the private Supabase `resumes` bucket (`{student_id}/resume.pdf`), time-limited signed URL download generation, replacement, deletion, and database synchronization.
-- **Live Job Discovery & Search**: Full-text keyword search across titles and descriptions, multi-parameter filters (work mode, employment type, experience level, location), pagination, and detailed job specification pages.
-- **Application Submission & Duplicate Prevention**: Backend student token verification, atomic application creation, and database-level duplicate prevention (`UNIQUE(job_id, student_id)`) returning HTTP 409 Conflict.
-- **Application Tracking & Hiring Stepper**: Dedicated application list and detail views with a visual progress stepper reflecting the authoritative stage (`Applied` &rarr; `Screening` &rarr; `Interview` &rarr; `Offer` &rarr; `Hired` or terminal `Rejected`).
-- **Interviews & Notifications Hub**: Scheduled interview coordinates with meeting links, automatic audit and status change notifications, and mark-as-read functionality.
-- **Additive Database Migration 004**: Adds `phone` to `candidate_profiles`, automated audit logging triggers, and application notification triggers.
-- **Repeatable Development Job Seed Script**: Safe `seed_jobs.sql` script populating 6 fictional job openings linked to an authorized recruiter.
-- **Automated Test Suite**: 20 backend unit/integration tests with 100% pass rate.
+The platform provides two strictly separated, role-governed portals:
+1. **Student Portal** — Candidates build verified profiles, securely store PDF resumes in private cloud vaults, receive personalized job recommendations with transparent match scores, perform deep resume entity analysis, and track application stages.
+2. **Recruiter Portal** — Corporate recruiters publish job openings, review applicant pipelines with side-by-side match scorecards, evaluate candidates with time-limited signed resume access, schedule and reschedule interviews, record round feedback, and leverage an automated Follow-up Center.
 
 ---
 
-## 2. Technology Stack
+## 2. Key Capabilities & Architecture
+
+```
+                    ┌──────────────────────────────────────────────┐
+                    │          React Frontend (Vite + TS)          │
+                    │  • /                      (Portal Gateway)   │
+                    │  • /student/dashboard     (Guarded Student)  │
+                    │  • /student/jobs          (Job Discovery)    │
+                    │  • /student/resume-analysis (Intelligence)   │
+                    │  • /recruiter/dashboard   (Enterprise RBAC)  │
+                    │  • /recruiter/applicants  (Pipeline & Match) │
+                    │  • /recruiter/interviews  (Coordination)     │
+                    └──────────────┬────────────────┬──────────────┘
+                                   │                │
+         Direct Supabase Auth JWT  │                │ Bearer Token
+         + Storage Upload (RLS)    │                │ (Strict RBAC Verification)
+                                   ▼                ▼
+         ┌──────────────────────────┐      ┌──────────────────────────┐
+         │      Supabase Cloud      │      │     FastAPI Backend      │
+         │  • Auth API (/auth/v1)   │◄─────┤  • Smart Match Engine    │
+         │  • PostgreSQL DB + RLS   │      │  • Local Resume Parser   │
+         │  • Private Bucket Resumes│      │  • Follow-up Intelligence│
+         └──────────────────────────┘      │  • Idempotent Reminders  │
+                                           └──────────────────────────┘
+```
+
+### Phase 4A — Smart Candidate–Job Matching
+- **Deterministic Match Engine** (`backend/app/services/matching_service.py`): Calculates authoritative 0–100 candidate-job alignment scores:
+  - **Required Skills Overlap (50 pts max)**: Semantic normalization and alias mapping (e.g., `React.js` &rarr; `React`, `TS` &rarr; `TypeScript`, `K8s` &rarr; `Kubernetes`).
+  - **Role & Specialization Alignment (20 pts max)**: Keyword alignment across target roles, headlines, and work experience.
+  - **Location & Work-Mode (15 pts max)**: Remote accommodation, hybrid proximity, and candidate location matching.
+  - **Experience & Education (15 pts max)**: Seniority level weighting and credential verification.
+- **Fairness & Partial-Profile Handling**: Candidates with incomplete profiles receive neutral baselines rather than 0% or false mismatch accusations.
+- **Decision-Support Governance**: Every match rating is accompanied by transparent positive/negative factor explanations and an explicit human-in-the-loop notice.
+
+### Phase 4B — Resume Intelligence & Tailoring
+- **Local PDF Text Extraction**: Uses pure-Python `pypdf` with zero dependency on external paid AI APIs. Resume text is processed ephemerally and never permanently logged.
+- **Entity Detection**: Automatically detects skills, degree levels, fields of study, graduation dates, work experiences, project titles, and professional certifications.
+- **Scanned Document Detection**: Multi-page PDFs yielding < 40 characters of extractable text are flagged with `is_scanned_or_empty: True` along with actionable guidance to re-export as a searchable PDF.
+- **Profile vs. Resume Discrepancies**: Compares extracted resume data against saved profile data to highlight discrepancies without mutating candidate records.
+- **Job-Specific Tailoring**: Compares resume text against published job descriptions, highlighting required skills found, skills not detected, and concrete tailoring tips.
+
+### Phase 4C — Follow-up Intelligence & Automated Reminders
+- **Recruiter Follow-up Center**: Dedicated dashboard identifying:
+  - Unreviewed newly submitted applications (`stage == 'applied'`).
+  - Stale applications exceeding stage thresholds (`applied` > 3 days, `screening` > 5 days, `interview` > 5 days, `offer` > 7 days).
+  - Upcoming interviews in the next 24–48 hours (highlighting <= 24 hours as High Priority).
+  - Completed interviews with missing interviewer feedback.
+  - Low-volume job postings (< 2 applicants after 3 days).
+- **Automated Interview Reminder Lifecycle**: Scans scheduled interviews occurring within 48 hours and idempotently delivers student in-app notifications without creating duplicates across repeated runs.
+- **Notification Hub**: Full student notifications center with "Mark all as read" (`POST /api/student/notifications/read-all`), unread filter tabs, contextual icon badges, and direct application links.
+
+### Phase 4D — Hiring Insights & Dashboard Integration
+- **Student Dashboard**: Real-time stage distribution, outstanding action alerts (e.g., missing resume), upcoming rounds, and top recommended jobs with match badges.
+- **Recruiter Dashboard**: 6-metric KPI row, pipeline stage distribution visual breakdown, and embedded Follow-up Intelligence widget with on-demand reminder runner.
+
+---
+
+## 3. Technology Stack
 
 ### Frontend
-- **Framework**: React 18 with Vite 6
-- **Language**: TypeScript 5
-- **Styling**: Tailwind CSS with custom SaaS light theme
+- **Framework**: React 18.3 with Vite 6.4
+- **Language**: TypeScript 5.8
+- **Styling**: Tailwind CSS with custom SaaS light/dark aesthetic and micro-animations
 - **Routing**: React Router 7
 - **Icons**: Lucide React
 - **Auth Client**: Official Supabase JS SDK (`@supabase/supabase-js`)
@@ -43,51 +92,29 @@ This release completes **Phase 2: Complete Student Portal**:
 ### Backend
 - **Framework**: FastAPI (Python 3.10+)
 - **Server**: Uvicorn ASGI
-- **Data Validation & Settings**: Pydantic v2 & `pydantic-settings`
+- **Validation**: Pydantic v2 & `pydantic-settings`
+- **PDF Extraction**: `pypdf` 5.0+ (pure-Python, lightweight, local)
 - **HTTP Client**: HTTPX (async)
 - **Testing**: Pytest & `pytest-asyncio`
 
 ### Database & Storage
 - **Database**: Supabase PostgreSQL 15+
 - **Security**: PostgreSQL Row-Level Security (RLS) & Security Definer helper functions
-- **Private Storage**: Supabase Storage bucket `resumes`
+- **Private Storage**: Supabase Storage bucket `resumes` (`{student_id}/resume.pdf`) with short-lived signed URLs (300s expiry)
 
 ---
 
-## 3. Architecture & Security Model
+## 4. Security & Role-Based Access Control (RBAC)
 
-```
-                    ┌─────────────────────────────────────────┐
-                    │      React Frontend (Vite + TS)         │
-                    │  • /                      (Landing Page)│
-                    │  • /student/login         (Student Auth)│
-                    │  • /student/signup        (Student Only)│
-                    │  • /student/dashboard     (Guarded)     │
-                    │  • /recruiter/login       (Restricted)  │
-                    │  • /recruiter/dashboard   (Guarded)     │
-                    └────────────┬───────────────┬────────────┘
-                                 │               │
-       Direct Supabase Auth JWT  │               │ Bearer Token
-       + Storage Upload (RLS)    │               │
-                                 ▼               ▼
-        ┌─────────────────────────┐     ┌─────────────────────────┐
-        │     Supabase Cloud      │     │     FastAPI Backend     │
-        │  • Auth API (/auth/v1)  │◄────┤  • GET /health          │
-        │  • PostgreSQL DB + RLS  │◄────┤  • GET /api/me          │
-        │  • Private Bucket Resumes│     │  • GET /recruiter-check │
-        └─────────────────────────┘     └─────────────────────────┘
-```
-
-### Critical Role & Security Rules
-1. **Public Signup Constraint**: Public registration (`/student/signup`) is hardcoded to create `student` accounts only. Even if client metadata attempts to inject `role: "recruiter"`, the PostgreSQL trigger `handle_new_auth_user()` unconditionally forces `role = 'student'`.
-2. **Immutability of Roles**: The trigger `prevent_profile_role_tampering()` prevents any standard user from changing their own or other users' roles. Only `service_role` or a database administrator can update roles.
-3. **No Role-Switch Controls**: There is no student/recruiter toggle in the application. Recruiter accounts are restricted and must be provisioned by a workspace administrator.
-4. **Recruiter Portal Gate**: Logging in via `/recruiter/login` immediately checks the authoritative role from the backend. Student accounts are rejected with an explicit security alert and signed out instantly.
-5. **Private Resume Vault**: Resumes are stored in a private Supabase bucket (`resumes`). Resumes can only be read by the student owner, or by an authorized recruiter who owns a job that student applied for.
+1. **Strict Role Separation**: Public signups (`/student/signup`) are forced to role `student` by a PostgreSQL trigger (`handle_new_auth_user()`). Client-injected roles are discarded.
+2. **Immutable Roles**: The database trigger `prevent_profile_role_tampering()` prevents users from elevating their own privileges.
+3. **Recruiter Gating**: Logging into `/recruiter/login` immediately calls FastAPI `/api/recruiter-check`. Student tokens receive `403 Forbidden` and are signed out immediately.
+4. **Ownership Verification**: All recruiter actions (viewing candidates, updating stages, scheduling interviews, downloading resumes) verify job ownership against the authenticated recruiter ID.
+5. **Private Resume Vault**: Resumes can only be downloaded by the candidate owner or by an authorized recruiter reviewing an active application for their job.
 
 ---
 
-## 4. Project Structure
+## 5. Repository Structure
 
 ```
 HireFlow/
@@ -95,160 +122,194 @@ HireFlow/
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── routes/
-│   │   │   │   ├── auth.py          # /api/me & /api/recruiter-check routes
-│   │   │   │   └── health.py        # /health service status endpoint
-│   │   │   └── deps.py              # JWT & role verification dependencies
+│   │   │   │   ├── auth.py                  # Token verification & recruiter-check
+│   │   │   │   ├── health.py                # Service health status
+│   │   │   │   ├── jobs.py                  # Published job discovery & application
+│   │   │   │   ├── recruiter.py             # Recruiter workspace & follow-up center
+│   │   │   │   └── student.py               # Student profile, resume analysis & notifications
+│   │   │   └── deps.py                      # Bearer auth & RBAC dependencies
 │   │   ├── core/
-│   │   │   ├── config.py            # Pydantic Settings & environment config
-│   │   │   └── security.py          # Bearer auth & sanitizing logger
+│   │   │   ├── config.py                    # Environment settings
+│   │   │   └── security.py                  # Bearer extraction & sanitizing logger
 │   │   ├── schemas/
-│   │   │   ├── auth.py              # UserProfile & Error schemas
-│   │   │   └── health.py            # HealthResponse schema
+│   │   │   ├── applications.py              # Application and interview models
+│   │   │   ├── auth.py                      # User profiles & role definitions
+│   │   │   ├── follow_up.py                 # Follow-up center & reminder models
+│   │   │   ├── jobs.py                      # Job listing & response schemas
+│   │   │   ├── matching.py                  # Phase 4A JobMatchScore schema
+│   │   │   ├── recruiter.py                 # Recruiter applicant and dashboard schemas
+│   │   │   ├── resume_intelligence.py       # Phase 4B detected entities & section health
+│   │   │   └── student_dashboard.py         # Student dashboard and notification schemas
 │   │   ├── services/
-│   │   │   └── supabase_auth.py     # Supabase token & PostgREST role service
-│   │   └── main.py                  # FastAPI application entrypoint
+│   │   │   ├── follow_up_service.py         # Follow-up aggregation & reminder runner
+│   │   │   ├── matching_service.py          # Deterministic candidate-job matching engine
+│   │   │   ├── recruiter_service.py         # Recruiter pipeline and interview management
+│   │   │   ├── resume_intelligence_service.py # In-house PDF text extraction and parsing
+│   │   │   ├── student_service.py           # Student profile builder & applications
+│   │   │   └── supabase_auth.py             # Supabase Auth integration
+│   │   └── main.py                          # FastAPI ASGI entrypoint
 │   ├── tests/
-│   │   ├── test_auth.py             # Auth & RBAC unit/integration tests
-│   │   └── test_health.py           # Health endpoint tests
-│   ├── render.yaml                  # Render deployment configuration
-│   ├── requirements.txt             # Python backend dependencies
-│   └── .env.example                 # Backend environment variable template
+│   │   ├── test_auth.py                     # Auth & RBAC security tests
+│   │   ├── test_follow_up_and_notifications.py # Follow-up, reminders & idempotency tests
+│   │   ├── test_health.py                   # Health endpoint tests
+│   │   ├── test_jobs_and_applications.py    # Job discovery & application tests
+│   │   ├── test_matching.py                 # Matching algorithm & scoring tests
+│   │   ├── test_recruiter.py                # Recruiter workspace & ownership tests
+│   │   ├── test_resume_intelligence.py      # PDF parsing, corruption & boundary tests
+│   │   └── test_student_profile.py          # Profile completeness tests
+│   ├── render.yaml                          # Render deployment configuration
+│   ├── requirements.txt                     # Backend dependencies
+│   └── .env.example                         # Backend environment template
 ├── frontend/
 │   ├── src/
-│   │   ├── components/              # Navbar, Footer, ProtectedRoute, Alert, RoleBadge
-│   │   ├── layouts/                 # RootLayout, DashboardLayout
+│   │   ├── components/                      # Navbar, MatchScoreBadge, Alert, LoadingSpinner
+│   │   ├── layouts/                         # DashboardLayout
 │   │   ├── pages/
-│   │   │   ├── auth/                # StudentLogin, StudentSignup, RecruiterLogin, ForgotPassword
-│   │   │   ├── student/             # StudentDashboardPage
-│   │   │   ├── recruiter/           # RecruiterDashboardPage
-│   │   │   ├── LandingPage.tsx      # Main landing & portal gateway
-│   │   │   └── NotFoundPage.tsx     # 404 handler
-│   │   ├── hooks/                   # useAuth hook & AuthProvider
-│   │   ├── services/                # api.ts (FastAPI) & supabase.ts (Client)
-│   │   ├── types/                   # TypeScript interfaces
-│   │   ├── App.tsx                  # React Router configuration
-│   │   └── main.tsx                 # DOM render entrypoint
-│   ├── vercel.json                  # Vercel deployment configuration
-│   ├── package.json                 # Node dependencies
-│   ├── vite.config.ts               # Vite configuration
-│   └── .env.example                 # Frontend environment template
+│   │   │   ├── auth/                        # StudentLogin, StudentSignup, RecruiterLogin
+│   │   │   ├── recruiter/                   # RecruiterDashboardPage, RecruiterJobsPage,
+│   │   │   │                                # RecruiterApplicantsPage, RecruiterInterviewsPage
+│   │   │   ├── student/                     # StudentDashboardPage, JobDiscoveryPage,
+│   │   │   │                                # JobDetailPage, StudentApplicationsPage,
+│   │   │   │                                # StudentResumeAnalysisPage, StudentNotificationsPage,
+│   │   │   │                                # StudentProfilePage
+│   │   │   ├── LandingPage.tsx              # Public landing page
+│   │   │   └── NotFoundPage.tsx             # 404 handler
+│   │   ├── hooks/                           # useAuth hook & AuthContext
+│   │   ├── services/                        # api.ts (FastAPI) & storage.ts (Supabase)
+│   │   ├── types/                           # TypeScript interfaces
+│   │   ├── App.tsx                          # Application routes
+│   │   └── main.tsx                         # DOM entrypoint
+│   ├── package.json                         # Frontend dependencies
+│   ├── vite.config.ts                       # Vite build configuration
+│   └── .env.example                         # Frontend environment template
 ├── database/
 │   ├── migrations/
-│   │   ├── 001_initial_schema.sql   # Tables, constraints, user triggers
-│   │   ├── 002_row_level_security.sql # Granular RLS policies for all 7 tables
-│   │   └── 003_storage.sql          # Private 'resumes' bucket & policies
-│   ├── provision_recruiter.sql      # Admin recruiter provisioning SQL procedure
-│   └── seed.sql                     # Development seed template
-├── docs/
-│   ├── architecture.md              # In-depth architectural & RLS specification
-│   └── setup_guide.md               # Step-by-step setup for PowerShell and Unix
-├── .gitignore                       # Multi-stack git exclusions
-└── README.md                        # Project documentation
+│   │   ├── 001_initial_schema.sql           # Schema, tables, triggers
+│   │   ├── 002_row_level_security.sql       # RLS policies across all tables
+│   │   ├── 003_storage.sql                  # Private 'resumes' bucket setup
+│   │   ├── 004_student_portal_enhancements.sql # Logging and stage change triggers
+│   │   └── 005_recruiter_portal_enhancements.sql # Compensation schema update
+│   ├── provision_recruiter.sql              # Recruiter provisioning script
+│   └── seed_jobs.sql                        # Demonstration job postings
+├── .gitignore
+└── README.md
 ```
 
 ---
 
-## 5. Quick Start (Local Development)
+## 6. Quick Start & Local Setup
 
-### 1. Database Setup in Supabase
-1. Create a Supabase project at [supabase.com](https://supabase.com).
-2. Open the **SQL Editor** in your Supabase dashboard and run the SQL migration scripts in order:
-   - [database/migrations/001_initial_schema.sql](file:///c:/Users/Saket/OneDrive/Desktop/HireFlow/database/migrations/001_initial_schema.sql)
-   - [database/migrations/002_row_level_security.sql](file:///c:/Users/Saket/OneDrive/Desktop/HireFlow/database/migrations/002_row_level_security.sql)
-   - [database/migrations/003_storage.sql](file:///c:/Users/Saket/OneDrive/Desktop/HireFlow/database/migrations/003_storage.sql)
+### Prerequisites
+- **Node.js** 18+ and **npm**
+- **Python** 3.10+ (Python 3.13 supported)
+- A free **Supabase** account ([supabase.com](https://supabase.com))
+
+### 1. Database Setup (Supabase)
+1. In your Supabase project, navigate to the **SQL Editor**.
+2. Run the migration scripts in numerical order:
+   - `database/migrations/001_initial_schema.sql`
+   - `database/migrations/002_row_level_security.sql`
+   - `database/migrations/003_storage.sql`
+   - `database/migrations/004_student_portal_enhancements.sql`
+   - `database/migrations/005_recruiter_portal_enhancements.sql`
+3. Optional: Run `database/seed_jobs.sql` to populate sample corporate job postings.
 
 ### 2. Backend Setup
-```powershell
-# Create virtual environment and install packages
+```bash
+# Navigate to backend
+cd backend
+
+# Create and activate virtual environment
 python -m venv .venv
+
+# Windows PowerShell:
 .\.venv\Scripts\Activate.ps1
-pip install -r backend\requirements.txt
+# macOS / Linux:
+source .venv/bin/activate
 
-# Create .env from template
-Copy-Item backend\.env.example backend\.env
-# Populate SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, and SUPABASE_SERVICE_ROLE_KEY
+# Install dependencies
+pip install -r requirements.txt
 
-# Run backend unit tests
-$env:PYTHONPATH="backend"
-.\.venv\Scripts\pytest backend\tests -v
-
-# Start FastAPI dev server
-.\.venv\Scripts\uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+# Configure environment
+cp .env.example .env
 ```
+
+Configure `backend/.env`:
+```ini
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+PORT=8000
+ENVIRONMENT=development
+```
+
+Run the backend server:
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+API Documentation: `http://localhost:8000/docs`
 
 ### 3. Frontend Setup
-In a new terminal:
-```powershell
+```bash
+# Navigate to frontend (in a separate terminal)
 cd frontend
 
-# Install npm packages
+# Install dependencies
 npm install
 
-# Create environment file from template
-Copy-Item .env.example .env.local
-# Populate VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY
+# Configure environment
+cp .env.example .env.local
+```
 
-# Verify TypeScript build
-npm run build
+Configure `frontend/.env.local`:
+```ini
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+VITE_API_BASE_URL=http://localhost:8000
+```
 
-# Start Vite dev server
+Start the frontend development server:
+```bash
 npm run dev
 ```
-Open **`http://localhost:5173`** in your browser.
+Access the application at: `http://localhost:5173`
 
 ---
 
-## 6. Authorizing a Recruiter Account
+## 7. Automated Testing
 
-Recruiter accounts cannot self-register. To grant recruiter privileges:
-1. The user registers normally via the Student Signup page (`/student/signup`).
-2. An authorized database admin runs the SQL snippet in [database/provision_recruiter.sql](file:///c:/Users/Saket/OneDrive/Desktop/HireFlow/database/provision_recruiter.sql) in the Supabase SQL Editor:
-```sql
-UPDATE public.profiles
-SET role = 'recruiter', updated_at = NOW()
-WHERE id = (SELECT id FROM auth.users WHERE email = 'recruiter@company.com');
+### Backend Test Suite (Pytest)
+The test suite covers authentication, role authorization, deterministic matching, PDF resume text extraction, corrupt file handling, notification dispatch, recruiter follow-ups, and reminder idempotency.
+
+```bash
+# Run all 66 tests
+pytest backend/tests
 ```
-3. The recruiter can now sign in at **`/recruiter/login`**.
+**Current Status**: `66 passed in 1.09s` (100% pass rate).
 
-## 7. Phase 2 API Endpoints
-
-### Student Portal & Jobs API
-
-| Method | Endpoint | Auth | Description |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/student/dashboard-stats` | Student | Profile completion %, app counts, interviews, recent updates |
-| `GET` | `/api/student/profile` | Student | Candidate profile details (education, experience, skills, resume) |
-| `PATCH`| `/api/student/profile` | Student | Updates candidate profile details |
-| `PATCH`| `/api/student/profile/resume` | Student | Records uploaded resume path in candidate profile |
-| `DELETE`| `/api/student/profile/resume` | Student | Removes resume path from candidate profile |
-| `GET` | `/api/jobs` | Public / Student | Discovers open published jobs with search & filters |
-| `GET` | `/api/jobs/{id}` | Public / Student | Full job specification and application status |
-| `POST`| `/api/jobs/{id}/apply` | Student | Submits job application with duplicate prevention |
-| `GET` | `/api/student/applications` | Student | Lists student's submitted applications |
-| `GET` | `/api/student/applications/{id}`| Student | Detailed application progress, stage stepper, logs |
-| `GET` | `/api/student/interviews` | Student | Scheduled interview coordinates and meeting links |
-| `GET` | `/api/student/notifications` | Student | Lists application and interview notifications |
-| `PATCH`| `/api/student/notifications/{id}/read` | Student | Marks notification as read |
+### Frontend Production Build (TypeScript + Vite)
+```bash
+npm --prefix frontend run build
+```
+**Current Status**: Clean compilation with zero TypeScript errors.
 
 ---
 
-## 8. Verification & Test Results
+## 8. Automated Follow-up & Reminder Automation
 
-| Test Category | Command | Result | Notes |
-| :--- | :--- | :--- | :--- |
-| **Backend Pytest** | `pytest backend/tests -v` | **20 passed** (100%) | Auth, Health, Jobs discovery, Applications, Duplicates, Isolation, Profile lifecycle, Resume metadata, Notifications, Interviews |
-| **Live Health Check** | `GET /health` | **HTTP 200** | Live FastAPI server validated |
-| **Live Auth Gate** | `GET /api/me` | **HTTP 401** | Correctly rejects unauthenticated requests |
-| **TypeScript Build** | `npm run build` | **0 errors** | 1,674 modules transformed, clean production bundle |
-| **Browser E2E** | Chrome Subagent | **All routes verified** | Real database queries, accessible forms, zero console errors |
+The automated reminder lifecycle can run via any of the following mechanisms:
+
+1. **CLI / Cron Job** (Recommended for Render or GitHub Actions):
+   ```bash
+   python -m app.services.follow_up_service
+   ```
+2. **On-Demand Recruiter Action**:
+   Recruiters can trigger an immediate reminder scan via the "Run Reminder Scan" button on the Recruiter Dashboard (`POST /api/recruiter/follow-ups/process-reminders`).
+3. **Scheduled Webhook**:
+   Automated hourly cron trigger pinging `POST /api/recruiter/follow-ups/process-reminders`.
 
 ---
 
-## 9. Phase 3 Roadmap (Recruiter Portal)
+## 9. License
 
-The following modules are scheduled for **Phase 3: Recruiter Portal**:
-- [ ] Recruiter Job Management CRUD: Create, publish, edit, close, and archive job postings.
-- [ ] Applicant Pipeline Kanban: Drag-and-drop applicant cards across hiring stages (`applied` &rarr; `screening` &rarr; `interview` &rarr; `offer` &rarr; `hired`).
-- [ ] Resume Review Vault: In-browser PDF resume viewer and secure authorized download for recruiters.
-- [ ] Interview Coordination: Schedule interviews, assign meeting links, and submit recruiter feedback.
-- [ ] Candidate Status Communication: Automated notifications and email updates on stage changes.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

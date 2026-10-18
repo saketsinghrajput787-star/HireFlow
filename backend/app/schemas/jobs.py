@@ -1,5 +1,6 @@
 from typing import Optional, List
 from pydantic import BaseModel, Field
+from app.schemas.matching import JobMatchScore
 
 
 class JobResponse(BaseModel):
@@ -20,6 +21,7 @@ class JobResponse(BaseModel):
     has_applied: bool = False
     application_id: Optional[str] = None
     application_stage: Optional[str] = None
+    match: Optional[JobMatchScore] = None
 
 
 class JobListResponse(BaseModel):

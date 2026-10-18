@@ -5,6 +5,8 @@ interface AlertProps {
   type?: 'error' | 'success' | 'info';
   title?: string;
   message: string;
+  action?: React.ReactNode;
+  children?: React.ReactNode;
   onClose?: () => void;
   className?: string;
 }
@@ -13,6 +15,8 @@ export const Alert: React.FC<AlertProps> = ({
   type = 'error',
   title,
   message,
+  action,
+  children,
   onClose,
   className = '',
 }) => {
@@ -37,6 +41,8 @@ export const Alert: React.FC<AlertProps> = ({
       <div className="flex-1 text-sm">
         {title && <p className="font-semibold mb-0.5">{title}</p>}
         <p className="leading-relaxed">{message}</p>
+        {action && <div className="mt-2">{action}</div>}
+        {children && <div className="mt-2">{children}</div>}
       </div>
       {onClose && (
         <button

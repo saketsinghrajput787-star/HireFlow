@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { api } from '../services/api';
 import { UserProfile } from '../types';
@@ -26,26 +26,72 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [session, setSession] = useState<any | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const isAuthenticatingRef = useRef<boolean>(false);
 
   /**
-   * Fetch authoritative user profile and role from the backend
+   * Fetch authoritative user profile and role.
+   * Priority:
+   * 1. FastAPI backend /api/me (cryptographic token verification and service-role database lookup)
+   * 2. Direct Supabase database query (if backend is offline/unreachable; permitted under RLS profiles_select_own)
    */
-  const loadAuthoritativeProfile = async (accessToken: string, currentUser: any) => {
+  const loadAuthoritativeProfile = async (accessToken: string, currentUser: any): Promise<UserProfile> => {
+    // 1. Try FastAPI backend /api/me
     try {
       const authProfile = await api.getMe(accessToken);
+      if (!authProfile || !authProfile.role) {
+        throw new Error('Invalid profile response from backend service');
+      }
       setProfile(authProfile);
       return authProfile;
-    } catch (err: any) {
-      console.warn('Backend profile resolution unavailable, falling back to local metadata:', err.message);
-      // Fallback for when backend might be starting or offline
-      const fallbackProfile: UserProfile = {
-        id: currentUser.id,
-        email: currentUser.email || '',
-        full_name: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'User',
-        role: 'student', // Public default is strictly student
-      };
-      setProfile(fallbackProfile);
-      return fallbackProfile;
+    } catch (backendErr: any) {
+      // If the backend explicitly reports profile missing (404), propagate immediately
+      if (backendErr.status === 404) {
+        throw backendErr;
+      }
+      // If token is invalid or expired (401), propagate immediately
+      if (backendErr.status === 401) {
+        throw backendErr;
+      }
+
+      console.warn('Backend /api/me unavailable, attempting direct Supabase profile resolution:', backendErr.message);
+
+      // 2. Direct Supabase query fallback for offline/unreachable backend
+      try {
+        const { data: profileRow, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, full_name, role, created_at')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.warn('Direct Supabase profile resolution error:', profileError.message);
+          throw profileError;
+        }
+
+        if (!profileRow) {
+          const notFoundError: any = new Error(
+            'Profile Record Missing: Your account exists in authentication, but no record was found in public.profiles. Please contact the administrator to initialize your profile record.'
+          );
+          notFoundError.status = 404;
+          throw notFoundError;
+        }
+
+        const resolvedProfile: UserProfile = {
+          id: profileRow.id,
+          email: currentUser.email || '',
+          full_name: profileRow.full_name || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'User',
+          role: profileRow.role || 'student',
+          created_at: profileRow.created_at,
+        };
+        setProfile(resolvedProfile);
+        return resolvedProfile;
+      } catch (dbErr: any) {
+        if (dbErr.status === 404) {
+          throw dbErr;
+        }
+        console.error('Direct profile resolution failed:', dbErr);
+        throw new Error('Unable to reach backend or database service to verify user profile. Please check your connection.');
+      }
     }
   };
 
@@ -68,7 +114,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (initialSession?.user) {
           setSession(initialSession);
           setUser(initialSession.user);
-          await loadAuthoritativeProfile(initialSession.access_token, initialSession.user);
+          try {
+            await loadAuthoritativeProfile(initialSession.access_token, initialSession.user);
+          } catch (profileErr: any) {
+            console.warn('Profile load on init warning:', profileErr.message);
+          }
         } else {
           setSession(null);
           setUser(null);
@@ -88,19 +138,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Subscribe to auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
+      async (event, newSession) => {
         if (!mounted) return;
+
+        // If manual sign-in is actively verifying roles, do not overwrite state prematurely
+        if (isAuthenticatingRef.current) {
+          return;
+        }
+
+        if (event === 'SIGNED_OUT' || !newSession?.user) {
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
 
         if (newSession?.user) {
           setSession(newSession);
           setUser(newSession.user);
-          await loadAuthoritativeProfile(newSession.access_token, newSession.user);
-        } else {
-          setSession(null);
-          setUser(null);
-          setProfile(null);
+          try {
+            await loadAuthoritativeProfile(newSession.access_token, newSession.user);
+          } catch (profileErr: any) {
+            console.warn('Profile load on auth change warning:', profileErr.message);
+          } finally {
+            if (mounted) setLoading(false);
+          }
         }
-        setLoading(false);
       }
     );
 
@@ -112,30 +176,98 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   /**
    * Student Login
+   * Security Rule: Authenticates, then immediately checks authoritative role.
+   * If the account role is 'recruiter', reject and sign out immediately.
    */
   const signInStudent = async (email: string, password: string) => {
     setError(null);
     setLoading(true);
+    isAuthenticatingRef.current = true;
     try {
       if (!isSupabaseConfigured) {
         throw new Error('Supabase credentials are not configured. Please update your environment variables.');
       }
 
+      const cleanEmail = email.trim();
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: cleanEmail,
         password,
       });
 
-      if (signInError) throw signInError;
+      if (signInError) {
+        const msg = (signInError.message || '').toLowerCase();
+        const code = (signInError as any).code || (signInError as any).error_code || '';
+
+        if (code === 'invalid_credentials' || msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
+          throw new Error('Invalid email or password. Please verify your credentials or register a student account.');
+        }
+
+        if (code === 'email_not_confirmed' || msg.includes('email not confirmed')) {
+          throw new Error('Email confirmation is required. Please check your inbox for the confirmation link.');
+        }
+
+        throw signInError;
+      }
+
       if (!data.session || !data.user) throw new Error('No session returned after login');
+
+      // Resolve authoritative profile
+      let authProfile: UserProfile;
+      try {
+        // Attempt trusted backend student check first if possible
+        try {
+          authProfile = await api.checkStudentAccess(data.session.access_token);
+        } catch (chkErr: any) {
+          if (chkErr.status === 403) {
+            // Backend explicitly rejected: user is a recruiter
+            await supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+            const roleMsg = 'This is a recruiter account. Please use Recruiter Login.';
+            setError(roleMsg);
+            throw new Error(roleMsg);
+          }
+          // Fallback to loadAuthoritativeProfile
+          authProfile = await loadAuthoritativeProfile(data.session.access_token, data.user);
+        }
+      } catch (err: any) {
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        throw err;
+      }
+
+      // Strict role verification for Student Portal
+      if (authProfile.role === 'recruiter') {
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        const recruiterMsg = 'This is a recruiter account. Please use Recruiter Login.';
+        setError(recruiterMsg);
+        throw new Error(recruiterMsg);
+      }
+
+      if (authProfile.role !== 'student' && authProfile.role !== 'admin') {
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        const unauthorizedMsg = 'Access denied: this portal requires a student account.';
+        setError(unauthorizedMsg);
+        throw new Error(unauthorizedMsg);
+      }
 
       setSession(data.session);
       setUser(data.user);
-      await loadAuthoritativeProfile(data.session.access_token, data.user);
+      setProfile(authProfile);
     } catch (err: any) {
       setError(err.message || 'Failed to sign in');
       throw err;
     } finally {
+      isAuthenticatingRef.current = false;
       setLoading(false);
     }
   };
@@ -147,17 +279,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signUpStudent = async (email: string, password: string, fullName: string) => {
     setError(null);
     setLoading(true);
+    isAuthenticatingRef.current = true;
     try {
       if (!isSupabaseConfigured) {
         throw new Error('Supabase credentials are not configured. Please update your environment variables.');
       }
 
+      const cleanEmail = email.trim();
       const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
+        email: cleanEmail,
         password,
         options: {
           data: {
-            full_name: fullName,
+            full_name: fullName.trim(),
             role: 'student', // Hardcoded constraint
           },
         },
@@ -174,6 +308,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setError(err.message || 'Failed to create student account');
       throw err;
     } finally {
+      isAuthenticatingRef.current = false;
       setLoading(false);
     }
   };
@@ -181,26 +316,108 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   /**
    * Recruiter Login
    * Security Rule: Authenticates, then immediately checks authoritative role.
-   * If the account role is not 'recruiter' or 'admin', reject and sign out immediately.
+   * If the account role is 'student', reject and sign out immediately.
    */
   const signInRecruiter = async (email: string, password: string) => {
     setError(null);
     setLoading(true);
+    isAuthenticatingRef.current = true;
     try {
       if (!isSupabaseConfigured) {
         throw new Error('Supabase credentials are not configured. Please update your environment variables.');
       }
 
+      const cleanEmail = email.trim();
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: cleanEmail,
         password,
       });
 
-      if (signInError) throw signInError;
-      if (!data.session || !data.user) throw new Error('No session returned after login');
+      if (signInError) {
+        const msg = (signInError.message || '').toLowerCase();
+        const code = (signInError as any).code || (signInError as any).error_code || '';
 
-      // Resolve authoritative role from backend
-      const authProfile = await loadAuthoritativeProfile(data.session.access_token, data.user);
+        if (code === 'invalid_credentials' || msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
+          throw new Error(
+            'Invalid email or password. Please verify your credentials. If you have not registered an account yet, you must first create one via Student Signup, as recruiter privileges are provisioned from an existing account.'
+          );
+        }
+
+        if (code === 'email_not_confirmed' || msg.includes('email not confirmed')) {
+          throw new Error(
+            'Email confirmation is required before signing in. Please check your inbox for the confirmation link or contact the administrator.'
+          );
+        }
+
+        if (code === 'over_email_send_rate_limit' || msg.includes('rate limit')) {
+          throw new Error('Too many login attempts. Please wait a few minutes before trying again.');
+        }
+
+        if (msg.includes('fetch') || msg.includes('network') || msg.includes('failed to fetch')) {
+          throw new Error('Unable to connect to the authentication server. Please check your network connection.');
+        }
+
+        throw new Error(signInError.message || 'Authentication failed. Please verify your recruiter credentials.');
+      }
+
+      if (!data.session || !data.user) {
+        throw new Error('Authentication failed: No session returned from authentication provider.');
+      }
+
+      // Resolve authoritative role from backend (or direct Supabase fallback)
+      let authProfile: UserProfile;
+      try {
+        // Attempt trusted backend recruiter authorization check first
+        try {
+          authProfile = await api.checkRecruiterAccess(data.session.access_token);
+        } catch (chkErr: any) {
+          if (chkErr.status === 403) {
+            // Backend rejected: student account attempting recruiter login
+            await supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+            const roleMsg = 'This is a student account. Please use Student Login.';
+            setError(roleMsg);
+            throw new Error(roleMsg);
+          }
+          // Fallback to loadAuthoritativeProfile
+          authProfile = await loadAuthoritativeProfile(data.session.access_token, data.user);
+        }
+      } catch (err: any) {
+        // Sign out immediately so no unverified session remains
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+
+        if (err.status === 404 || err.message?.toLowerCase().includes('not found') || err.message?.toLowerCase().includes('profile record missing')) {
+          const missingMsg =
+            'Profile Record Missing: Your account exists in authentication, but no record was found in public.profiles. Please contact the administrator to initialize your profile record.';
+          setError(missingMsg);
+          throw new Error(missingMsg);
+        }
+
+        if (err.status === 401 || err.message?.toLowerCase().includes('token') || err.message?.toLowerCase().includes('session')) {
+          const sessionMsg = 'Your session has expired or is invalid. Please sign in again.';
+          setError(sessionMsg);
+          throw new Error(sessionMsg);
+        }
+
+        throw err;
+      }
+
+      // Strict role verification for Recruiter Portal
+      if (authProfile.role === 'student') {
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+
+        const studentMsg = 'This is a student account. Please use Student Login.';
+        setError(studentMsg);
+        throw new Error(studentMsg);
+      }
 
       if (authProfile.role !== 'recruiter' && authProfile.role !== 'admin') {
         // Enforce boundary: Immediately terminate session for unauthorized role
@@ -210,18 +427,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setProfile(null);
 
         const unauthorizedMsg =
-          'Access Denied: This account does not possess authorized recruiter privileges. ' +
-          'Student accounts must log in via the Student Portal.';
+          'Your account is not authorized as a recruiter. Contact the administrator.';
         setError(unauthorizedMsg);
         throw new Error(unauthorizedMsg);
       }
 
       setSession(data.session);
       setUser(data.user);
+      setProfile(authProfile);
     } catch (err: any) {
       setError(err.message || 'Failed to authenticate recruiter');
       throw err;
     } finally {
+      isAuthenticatingRef.current = false;
       setLoading(false);
     }
   };

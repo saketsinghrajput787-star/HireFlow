@@ -9,13 +9,26 @@ from app.schemas.student import (
 )
 from app.schemas.applications import ApplicationSummary, ApplicationDetailResponse, InterviewDetail
 from app.schemas.student_dashboard import StudentDashboardStats, NotificationItem
+from app.schemas.resume_intelligence import (
+    ResumeAnalysisResponse,
+    JobSpecificResumeAnalysisRequest,
+    JobSpecificResumeAnalysisResponse,
+)
 from app.services.student_service import student_service, StudentService
+from app.services.resume_intelligence_service import (
+    resume_intelligence_service,
+    ResumeIntelligenceService,
+)
 
 router = APIRouter(prefix="/api/student", tags=["Student Portal"])
 
 
 def get_student_service() -> StudentService:
     return student_service
+
+
+def get_resume_intelligence_service() -> ResumeIntelligenceService:
+    return resume_intelligence_service
 
 
 @router.get(
@@ -70,6 +83,33 @@ async def remove_resume(
     service: StudentService = Depends(get_student_service),
 ) -> CandidateProfileResponse:
     return await service.delete_resume_metadata(current_user.id, current_user.email)
+
+
+@router.get(
+    "/resume/analysis",
+    response_model=ResumeAnalysisResponse,
+    summary="Analyze Uploaded Resume",
+    description="Extracts and analyzes entities from the authenticated student's uploaded PDF resume."
+)
+async def analyze_my_resume(
+    current_user: UserProfileResponse = Depends(require_student),
+    service: ResumeIntelligenceService = Depends(get_resume_intelligence_service),
+) -> ResumeAnalysisResponse:
+    return await service.analyze_student_resume(current_user.id, current_user.email)
+
+
+@router.post(
+    "/resume/analyze-job",
+    response_model=JobSpecificResumeAnalysisResponse,
+    summary="Analyze Resume Against Specific Job",
+    description="Evaluates student resume text alignment against a specific published job opening."
+)
+async def analyze_resume_for_job(
+    payload: JobSpecificResumeAnalysisRequest,
+    current_user: UserProfileResponse = Depends(require_student),
+    service: ResumeIntelligenceService = Depends(get_resume_intelligence_service),
+) -> JobSpecificResumeAnalysisResponse:
+    return await service.analyze_resume_against_job(current_user.id, payload.job_id)
 
 
 @router.get(
@@ -137,6 +177,19 @@ async def mark_read(
 ):
     success = await service.mark_notification_read(notification_id, current_user.id)
     return {"success": success}
+
+
+@router.post(
+    "/notifications/read-all",
+    status_code=status.HTTP_200_OK,
+    summary="Mark All Notifications as Read"
+)
+async def mark_all_read(
+    current_user: UserProfileResponse = Depends(require_student),
+    service: StudentService = Depends(get_student_service),
+):
+    success = await service.mark_all_notifications_read(current_user.id)
+    return {"success": success, "message": "All notifications marked as read."}
 
 
 @router.get(

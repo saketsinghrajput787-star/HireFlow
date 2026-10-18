@@ -13,7 +13,7 @@ export const StudentSignupPage: React.FC = () => {
   const [localError, setLocalError] = useState<string | null>(null);
   const [signupSuccess, setSignupSuccess] = useState(false);
 
-  const { signUpStudent, error, clearError } = useAuth();
+  const { signUpStudent, session, error, clearError } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,9 +40,8 @@ export const StudentSignupPage: React.FC = () => {
     try {
       await signUpStudent(email, password, fullName.trim());
       setSignupSuccess(true);
-      // If auto-logged in, route to dashboard in 2s
       setTimeout(() => {
-        navigate('/student/dashboard');
+        navigate(session ? '/student/dashboard' : '/student/login');
       }, 1500);
     } catch (err: any) {
       setLocalError(err.message || 'Failed to create student account.');

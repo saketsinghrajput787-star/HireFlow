@@ -23,27 +23,26 @@ export const StudentApplicationDetailPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchDetail = React.useCallback(() => {
+    if (!id || !session?.access_token) return;
+    setLoading(true);
+    setError(null);
+    api
+      .getStudentApplicationDetail(session.access_token, id)
+      .then((data) => {
+        setApplication(data);
+      })
+      .catch((err) => {
+        setError(err.message || 'Unable to load application details.');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [id, session?.access_token]);
+
   useEffect(() => {
-    let mounted = true;
-    if (id && session?.access_token) {
-      setLoading(true);
-      setError(null);
-      api
-        .getStudentApplicationDetail(session.access_token, id)
-        .then((data) => {
-          if (mounted) setApplication(data);
-        })
-        .catch((err) => {
-          if (mounted) setError(err.message || 'Unable to load application details.');
-        })
-        .finally(() => {
-          if (mounted) setLoading(false);
-        });
-    }
-    return () => {
-      mounted = false;
-    };
-  }, [id, session]);
+    fetchDetail();
+  }, [fetchDetail]);
 
   if (loading) {
     return <LoadingSpinner size="lg" message="Loading application timeline..." className="py-20" />;
@@ -52,13 +51,21 @@ export const StudentApplicationDetailPage: React.FC = () => {
   if (error || !application) {
     return (
       <div className="max-w-2xl mx-auto py-12 text-center space-y-4">
-        <Alert type="error" title="Application Not Found" message={error || 'This application record was not found.'} />
-        <Link
-          to="/student/applications"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
-        >
-          <ArrowLeft className="w-4 h-4" /> Return to applications
-        </Link>
+        <Alert type="error" title="Notice" message={error || 'This application record was not found.'} />
+        <div className="flex items-center justify-center gap-3">
+          <button
+            onClick={fetchDetail}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
+          >
+            Retry Loading
+          </button>
+          <Link
+            to="/student/applications"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 border border-slate-200 px-3 py-2 rounded-lg"
+          >
+            <ArrowLeft className="w-4 h-4" /> Return to applications
+          </Link>
+        </div>
       </div>
     );
   }

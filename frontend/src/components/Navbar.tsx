@@ -11,6 +11,7 @@ import {
   User,
   Shield,
   Bell,
+  Sparkles,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -32,8 +33,9 @@ export const Navbar: React.FC = () => {
   }, [session, profile, location.pathname]);
 
   const handleSignOut = async () => {
+    const isRecruiter = location.pathname.startsWith('/recruiter') || profile?.role === 'recruiter';
     await signOut();
-    navigate('/');
+    navigate(isRecruiter ? '/recruiter/login' : '/student/login', { replace: true });
   };
 
   const isStudent = profile?.role === 'student';
@@ -113,6 +115,17 @@ export const Navbar: React.FC = () => {
                     >
                       Profile
                     </Link>
+                    <Link
+                      to="/student/resume-analysis"
+                      className={`text-sm font-medium transition-colors flex items-center gap-1 ${
+                        location.pathname === '/student/resume-analysis'
+                          ? 'text-indigo-600 font-bold'
+                          : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                      Resume Intelligence
+                    </Link>
 
                     {/* Notification Bell */}
                     <Link
@@ -127,12 +140,48 @@ export const Navbar: React.FC = () => {
                     </Link>
                   </>
                 ) : (
-                  <Link
-                    to="/recruiter/dashboard"
-                    className="text-sm font-medium text-slate-700 hover:text-indigo-600 transition-colors"
-                  >
-                    Recruiter Dashboard
-                  </Link>
+                  <>
+                    <Link
+                      to="/recruiter/dashboard"
+                      className={`text-sm font-medium transition-colors ${
+                        location.pathname === '/recruiter/dashboard'
+                          ? 'text-indigo-600 font-bold'
+                          : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      Dashboard
+                    </Link>
+                    <Link
+                      to="/recruiter/jobs"
+                      className={`text-sm font-medium transition-colors ${
+                        location.pathname.startsWith('/recruiter/jobs')
+                          ? 'text-indigo-600 font-bold'
+                          : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      Job Postings
+                    </Link>
+                    <Link
+                      to="/recruiter/applicants"
+                      className={`text-sm font-medium transition-colors ${
+                        location.pathname.startsWith('/recruiter/applicants')
+                          ? 'text-indigo-600 font-bold'
+                          : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      Applicants
+                    </Link>
+                    <Link
+                      to="/recruiter/interviews"
+                      className={`text-sm font-medium transition-colors ${
+                        location.pathname.startsWith('/recruiter/interviews')
+                          ? 'text-indigo-600 font-bold'
+                          : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      Interviews
+                    </Link>
+                  </>
                 )}
 
                 <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
@@ -247,6 +296,13 @@ export const Navbar: React.FC = () => {
                     Candidate Profile
                   </Link>
                   <Link
+                    to="/student/resume-analysis"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-sm font-medium text-indigo-600 hover:text-indigo-800 py-1.5"
+                  >
+                    Resume Intelligence & Tailoring
+                  </Link>
+                  <Link
                     to="/student/notifications"
                     onClick={() => setMobileMenuOpen(false)}
                     className="block text-sm font-medium text-slate-700 hover:text-indigo-600 py-1.5"
@@ -255,13 +311,36 @@ export const Navbar: React.FC = () => {
                   </Link>
                 </div>
               ) : (
-                <Link
-                  to="/recruiter/dashboard"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block text-sm font-medium text-indigo-600 hover:text-indigo-800 py-1"
-                >
-                  Recruiter Dashboard
-                </Link>
+                <div className="space-y-1">
+                  <Link
+                    to="/recruiter/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-sm font-medium text-slate-700 hover:text-indigo-600 py-1.5"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    to="/recruiter/jobs"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-sm font-medium text-slate-700 hover:text-indigo-600 py-1.5"
+                  >
+                    Job Postings
+                  </Link>
+                  <Link
+                    to="/recruiter/applicants"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-sm font-medium text-slate-700 hover:text-indigo-600 py-1.5"
+                  >
+                    Applicant Pipeline
+                  </Link>
+                  <Link
+                    to="/recruiter/interviews"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-sm font-medium text-slate-700 hover:text-indigo-600 py-1.5"
+                  >
+                    Interview Coordination
+                  </Link>
+                </div>
               )}
 
               <div className="pt-2 border-t border-slate-100">

@@ -25,7 +25,10 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = Field(default="placeholder-service-key", description="Supabase service role secret key (backend only)")
 
     # CORS configuration: comma-separated list of allowed origins
-    CORS_ORIGINS: str = Field(default="http://localhost:5173,http://127.0.0.1:5173", description="Allowed CORS origins")
+    CORS_ORIGINS: str = Field(
+        default="http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:3000,http://127.0.0.1:3000",
+        description="Allowed CORS origins"
+    )
 
     # Server settings
     HOST: str = "0.0.0.0"
@@ -33,7 +36,7 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> List[str]:
-        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        return [origin.strip().rstrip('/') for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
     @property
     def is_configured(self) -> bool:

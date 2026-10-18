@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Alert } from '../../components/Alert';
-import { Briefcase, ArrowRight, Loader2, Lock, Mail, ShieldAlert } from 'lucide-react';
+import { Briefcase, ArrowRight, Loader2, Lock, Mail, ShieldAlert, GraduationCap, User } from 'lucide-react';
 
 export const RecruiterLoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -10,11 +10,18 @@ export const RecruiterLoginPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const { signInRecruiter, error, clearError } = useAuth();
+  const { signInRecruiter, error, clearError, session, profile, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = location.state?.from?.pathname || '/recruiter/dashboard';
+  // Strict route isolation: Ensure redirect strictly stays within recruiter workspace
+  const rawFrom = location.state?.from?.pathname;
+  const targetPath =
+    rawFrom &&
+    rawFrom.startsWith('/recruiter') &&
+    !rawFrom.includes('/login')
+      ? rawFrom
+      : '/recruiter/dashboard';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,13 +36,43 @@ export const RecruiterLoginPage: React.FC = () => {
     setSubmitting(true);
     try {
       await signInRecruiter(email, password);
-      navigate(from, { replace: true });
+      // Redirect to /recruiter/dashboard only after verified role
+      navigate(targetPath, { replace: true });
     } catch (err: any) {
       setLocalError(err.message || 'Authentication failed. Please verify your recruiter credentials.');
     } finally {
       setSubmitting(false);
     }
   };
+
+  const getErrorTitle = (msg: string): string => {
+    const lower = msg.toLowerCase();
+    if (lower.includes('student account')) {
+      return 'Student Account Detected';
+    }
+    if (lower.includes('not authorized as a recruiter') || lower.includes('access denied')) {
+      return 'Authorization Required';
+    }
+    if (lower.includes('email confirmation')) {
+      return 'Email Confirmation Required';
+    }
+    if (lower.includes('profile record missing') || lower.includes('not found in public.profiles')) {
+      return 'Profile Record Missing';
+    }
+    if (lower.includes('session') || lower.includes('token')) {
+      return 'Session Expired';
+    }
+    if (lower.includes('connection') || lower.includes('network') || lower.includes('unable to reach') || lower.includes('unable to connect')) {
+      return 'Connection Error';
+    }
+    if (lower.includes('too many login attempts')) {
+      return 'Rate Limit Exceeded';
+    }
+    return 'Authentication Failed';
+  };
+
+  const activeError = localError || error;
+  const isStudentError = activeError?.toLowerCase().includes('student account');
 
   return (
     <div className="flex-1 flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
@@ -50,6 +87,58 @@ export const RecruiterLoginPage: React.FC = () => {
           </p>
         </div>
 
+        {/* Existing Session Notice */}
+        {session && profile && (
+          <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-xs space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-slate-400" />
+                Active Session: {profile.email}
+              </span>
+              <span className="capitalize px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">
+                {profile.role}
+              </span>
+            </div>
+            {profile.role === 'recruiter' ? (
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-slate-600">You are already signed in.</span>
+                <div className="flex items-center gap-3">
+                  <Link
+                    to="/recruiter/dashboard"
+                    className="font-semibold text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1"
+                  >
+                    Dashboard <ArrowRight className="w-3 h-3" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => signOut()}
+                    className="text-rose-600 hover:text-rose-700 font-medium"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-amber-800 bg-amber-50 p-2.5 rounded-lg border border-amber-200 gap-2">
+                <span>
+                  This is a student account. Sign in below with your recruiter credentials, or{' '}
+                  <Link to="/student/dashboard" className="font-bold underline hover:text-amber-900">
+                    return to Student Dashboard
+                  </Link>
+                  .
+                </span>
+                <button
+                  type="button"
+                  onClick={() => signOut()}
+                  className="text-xs text-rose-600 hover:text-rose-700 font-semibold whitespace-nowrap"
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Security Warning Notice */}
         <div className="bg-amber-50/80 border border-amber-200 p-4 rounded-xl flex items-start gap-3">
           <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -63,16 +152,29 @@ export const RecruiterLoginPage: React.FC = () => {
           </div>
         </div>
 
-        {(localError || error) && (
-          <Alert
-            type="error"
-            title="Authorization Failed"
-            message={localError || error || ''}
-            onClose={() => {
-              setLocalError(null);
-              clearError();
-            }}
-          />
+        {activeError && (
+          <div className="space-y-2">
+            <Alert
+              type="error"
+              title={getErrorTitle(activeError)}
+              message={activeError}
+              onClose={() => {
+                setLocalError(null);
+                clearError();
+              }}
+            />
+            {isStudentError && (
+              <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-900 flex items-center justify-between">
+                <span>Looking for student jobs and applications?</span>
+                <Link
+                  to="/student/login"
+                  className="font-bold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
+                >
+                  Student Login <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            )}
+          </div>
         )}
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-5" noValidate>
@@ -144,8 +246,17 @@ export const RecruiterLoginPage: React.FC = () => {
           </button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-slate-100 text-center text-xs text-slate-500">
-          Need a recruiter account? Contact your HireFlow workspace administrator for provisioning.
+        <div className="mt-6 pt-6 border-t border-slate-100 flex flex-col gap-3 text-center text-xs text-slate-500">
+          <div>
+            Need a recruiter account? Contact your HireFlow workspace administrator for provisioning.
+          </div>
+          <div className="pt-2 border-t border-slate-50 flex items-center justify-center gap-1.5">
+            <GraduationCap className="w-3.5 h-3.5 text-indigo-600" />
+            Are you a student or candidate?{' '}
+            <Link to="/student/login" className="font-semibold text-indigo-600 hover:text-indigo-700 underline">
+              Sign In as Student
+            </Link>
+          </div>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from app.schemas.applications import ApplicationSummary, InterviewDetail
+from app.schemas.jobs import JobResponse
 
 
 class NotificationItem(BaseModel):
@@ -22,3 +23,5 @@ class StudentDashboardStats(BaseModel):
     recent_applications: List[ApplicationSummary] = Field(default_factory=list)
     upcoming_interviews: List[InterviewDetail] = Field(default_factory=list)
     unread_notifications_count: int = 0
+    recommended_jobs: List[JobResponse] = Field(default_factory=list)
+    has_resume: bool = False

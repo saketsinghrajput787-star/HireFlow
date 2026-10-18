@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import { JobItem } from '../../types';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Alert } from '../../components/Alert';
+import { MatchScoreBadge } from '../../components/MatchScoreBadge';
 import {
   Search,
   Briefcase,
@@ -15,6 +16,7 @@ import {
   CheckCircle2,
   Building,
   ArrowRight,
+  Sparkles,
 } from 'lucide-react';
 
 export const JobDiscoveryPage: React.FC = () => {
@@ -28,6 +30,7 @@ export const JobDiscoveryPage: React.FC = () => {
   const [workMode, setWorkMode] = useState('');
   const [employmentType, setEmploymentType] = useState('');
   const [experienceLevel, setExperienceLevel] = useState('');
+  const [sortBy, setSortBy] = useState<'default' | 'match_desc' | 'date_desc'>('default');
 
   const fetchJobs = async () => {
     setLoading(true);
@@ -62,9 +65,22 @@ export const JobDiscoveryPage: React.FC = () => {
     setWorkMode('');
     setEmploymentType('');
     setExperienceLevel('');
+    setSortBy('default');
   };
 
-  const hasActiveFilters = Boolean(searchTerm || workMode || employmentType || experienceLevel);
+  const hasActiveFilters = Boolean(searchTerm || workMode || employmentType || experienceLevel || sortBy !== 'default');
+
+  const displayJobs = [...jobs].sort((a, b) => {
+    if (sortBy === 'match_desc') {
+      return (b.match?.score ?? 0) - (a.match?.score ?? 0);
+    }
+    if (sortBy === 'date_desc') {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+    return 0;
+  });
+
+  const hasIncompleteProfileNotice = jobs.some((j) => j.match?.is_partial_profile);
 
   return (
     <div className="space-y-6">
@@ -77,6 +93,29 @@ export const JobDiscoveryPage: React.FC = () => {
       </div>
 
       {error && <Alert type="error" title="Notice" message={error} />}
+
+      {/* Incomplete profile guidance banner */}
+      {hasIncompleteProfileNotice && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-amber-100/80 text-amber-700 flex-shrink-0">
+              <Sparkles className="w-4 h-4 text-amber-600" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-amber-900">Enhance Your Job Matching Accuracy</h4>
+              <p className="text-xs text-amber-800 mt-0.5">
+                Your profile is missing technical skills or experience history. Add them to receive accurate match percentages and tailored recommendations.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/student/profile"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 transition-colors shadow-2xs whitespace-nowrap"
+          >
+            Complete Profile &rarr;
+          </Link>
+        </div>
+      )}
 
       {/* Search & Filter Bar */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
@@ -140,11 +179,22 @@ export const JobDiscoveryPage: React.FC = () => {
             <option value="senior_level">Senior Level</option>
           </select>
 
+          {/* Sort Option */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50/60 text-indigo-800 font-semibold input-focus-ring ml-auto"
+          >
+            <option value="default">Sort: Default</option>
+            <option value="match_desc">Sort: Highest Match Score</option>
+            <option value="date_desc">Sort: Newest First</option>
+          </select>
+
           {hasActiveFilters && (
             <button
               type="button"
               onClick={handleResetFilters}
-              className="inline-flex items-center gap-1 text-slate-500 hover:text-rose-600 transition-colors ml-auto text-xs"
+              className="inline-flex items-center gap-1 text-slate-500 hover:text-rose-600 transition-colors text-xs"
             >
               <X className="w-3.5 h-3.5" /> Reset Filters
             </button>
@@ -155,9 +205,9 @@ export const JobDiscoveryPage: React.FC = () => {
       {/* Jobs Listing */}
       {loading ? (
         <LoadingSpinner size="lg" message="Searching active opportunities..." className="py-20" />
-      ) : jobs.length > 0 ? (
+      ) : displayJobs.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {jobs.map((job) => (
+          {displayJobs.map((job) => (
             <div
               key={job.id}
               className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all flex flex-col justify-between space-y-4 group"
@@ -173,15 +223,18 @@ export const JobDiscoveryPage: React.FC = () => {
                       {job.company}
                     </p>
                   </div>
-                  {job.has_applied ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex-shrink-0">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Applied
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-slate-100 text-slate-600 flex-shrink-0">
-                      Open
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {job.match && <MatchScoreBadge match={job.match} size="sm" />}
+                    {job.has_applied ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Applied
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-slate-100 text-slate-600">
+                        Open
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
@@ -200,20 +253,29 @@ export const JobDiscoveryPage: React.FC = () => {
                   {job.description}
                 </p>
 
-                {/* Required Skills Chips */}
+                {/* Required Skills Chips with Match Highlighting */}
                 {job.required_skills && job.required_skills.length > 0 && (
                   <div className="flex flex-wrap gap-1 pt-1">
-                    {job.required_skills.slice(0, 4).map((skill, sIdx) => (
-                      <span
-                        key={sIdx}
-                        className="px-2 py-0.5 text-[11px] font-medium bg-indigo-50/70 text-indigo-700 rounded-md"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                    {job.required_skills.length > 4 && (
+                    {job.required_skills.slice(0, 5).map((skill, sIdx) => {
+                      const isMatched = job.match?.matched_skills?.some(
+                        (ms) => ms.toLowerCase() === skill.toLowerCase()
+                      );
+                      return (
+                        <span
+                          key={sIdx}
+                          className={`px-2 py-0.5 text-[11px] font-medium rounded-md transition-colors ${
+                            isMatched
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-semibold'
+                              : 'bg-indigo-50/70 text-indigo-700'
+                          }`}
+                        >
+                          {isMatched ? `✓ ${skill}` : skill}
+                        </span>
+                      );
+                    })}
+                    {job.required_skills.length > 5 && (
                       <span className="text-[11px] text-slate-400 self-center">
-                        +{job.required_skills.length - 4} more
+                        +{job.required_skills.length - 5} more
                       </span>
                     )}
                   </div>
@@ -230,7 +292,7 @@ export const JobDiscoveryPage: React.FC = () => {
                   to={`/student/jobs/${job.id}`}
                   className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
                 >
-                  View Details <ArrowRight className="w-3.5 h-3.5" />
+                  View Details & Match <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
             </div>

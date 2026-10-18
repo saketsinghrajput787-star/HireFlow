@@ -348,3 +348,40 @@ def test_student_interviews_list():
     finally:
         app.dependency_overrides.clear()
 
+
+def test_student_applications_unauthenticated():
+    """Verify that unauthenticated requests to /api/student/applications return 401 Unauthorized."""
+    app.dependency_overrides.clear()
+    res = client.get("/api/student/applications")
+    assert res.status_code == 401
+
+
+def test_student_applications_recruiter_rejected():
+    """Verify that recruiter users cannot access the student applications endpoint."""
+    app.dependency_overrides[get_auth_service] = lambda: MockAuthService(role="recruiter", user_id="recruiter-1")
+    try:
+        res = client.get(
+            "/api/student/applications",
+            headers={"Authorization": "Bearer recruiter-token"},
+        )
+        assert res.status_code == 403
+        assert "student" in res.json()["detail"].lower()
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_student_applications_empty_returns_200():
+    """Verify that a student with zero applications receives a 200 OK with an empty list."""
+    mock_service = MockJobService()
+    app.dependency_overrides[get_auth_service] = lambda: MockAuthService(user_id="new-student")
+    app.dependency_overrides[get_student_service] = lambda: mock_service
+    try:
+        res = client.get(
+            "/api/student/applications",
+            headers={"Authorization": "Bearer student-token"},
+        )
+        assert res.status_code == 200
+        assert res.json() == []
+    finally:
+        app.dependency_overrides.clear()
+

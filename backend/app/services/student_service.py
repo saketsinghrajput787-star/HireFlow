@@ -20,6 +20,7 @@ from app.schemas.applications import (
     ApplyJobResponse,
 )
 from app.schemas.student_dashboard import StudentDashboardStats, NotificationItem
+from app.services.matching_service import calculate_job_match
 
 
 class StudentService:
@@ -319,8 +320,9 @@ class StudentService:
                 ]
                 total = len(raw_jobs)
 
-            # Check student application status
+            # Check student application status and profile for matching
             applied_map: Dict[str, Dict[str, Any]] = {}
+            candidate_profile = None
             if student_id:
                 try:
                     app_res = await client.get(
@@ -333,10 +335,21 @@ class StudentService:
                 except Exception as e:
                     logger.warning("Error fetching student applied jobs: %s", str(e))
 
+                try:
+                    cand_res = await client.get(
+                        f"{base_url}/rest/v1/candidate_profiles?student_id=eq.{student_id}",
+                        headers=self._get_headers(),
+                    )
+                    if cand_res.status_code == 200 and cand_res.json():
+                        candidate_profile = cand_res.json()[0]
+                except Exception as e:
+                    logger.warning("Error fetching candidate profile for matching: %s", str(e))
+
             items: List[JobResponse] = []
             for j in raw_jobs:
                 job_id = j["id"]
                 app_info = applied_map.get(job_id)
+                match_score = calculate_job_match(j, candidate_profile) if student_id else None
                 items.append(
                     JobResponse(
                         id=job_id,
@@ -356,6 +369,7 @@ class StudentService:
                         has_applied=bool(app_info),
                         application_id=app_info.get("id") if app_info else None,
                         application_stage=app_info.get("stage") if app_info else None,
+                        match=match_score,
                     )
                 )
 
@@ -391,10 +405,12 @@ class StudentService:
                 detail="This job posting is not currently open for applications.",
             )
 
-        # Check application status
+        # Check application status & candidate profile for match analysis
         has_applied = False
         app_id = None
         app_stage = None
+        match_score = None
+
         if student_id:
             try:
                 app_res = await client.get(
@@ -407,6 +423,16 @@ class StudentService:
                     app_stage = app_res.json()[0]["stage"]
             except Exception as e:
                 logger.warning("Error checking application status: %s", str(e))
+
+            try:
+                cand_res = await client.get(
+                    f"{base_url}/rest/v1/candidate_profiles?student_id=eq.{student_id}",
+                    headers=self._get_headers(),
+                )
+                candidate_profile = cand_res.json()[0] if cand_res.status_code == 200 and cand_res.json() else None
+                match_score = calculate_job_match(job_row, candidate_profile)
+            except Exception as e:
+                logger.warning("Error computing job detail match: %s", str(e))
 
         return JobResponse(
             id=job_row["id"],
@@ -426,6 +452,7 @@ class StudentService:
             has_applied=has_applied,
             application_id=app_id,
             application_stage=app_stage,
+            match=match_score,
         )
 
     # =========================================================================
@@ -520,6 +547,31 @@ class StudentService:
             except Exception as e:
                 logger.warning("Failed to record candidate note in activity_logs: %s", str(e))
 
+        # 5. Insert student in-app notification for application submitted (idempotent)
+        if application_id:
+            try:
+                job_res = await client.get(
+                    f"{base_url}/rest/v1/jobs?id=eq.{job_id}&select=title,company",
+                    headers=self._get_headers(),
+                )
+                j_info = job_res.json()[0] if job_res.status_code == 200 and job_res.json() else {}
+                j_title = j_info.get("title", "Position")
+                j_comp = j_info.get("company", "Company")
+
+                await client.post(
+                    f"{base_url}/rest/v1/notifications",
+                    headers=self._get_headers(),
+                    json={
+                        "recipient_id": student_id,
+                        "notification_type": "application_submitted",
+                        "title": f"Application Submitted: {j_title}",
+                        "message": f"Your application for {j_title} at {j_comp} was successfully submitted and received by the hiring team.",
+                        "related_application_id": str(application_id),
+                    },
+                )
+            except Exception as e:
+                logger.warning("Failed to record application_submitted notification: %s", str(e))
+
         return ApplyJobResponse(
             application_id=str(application_id),
             job_id=job_id,
@@ -533,18 +585,24 @@ class StudentService:
         base_url = settings.SUPABASE_URL.rstrip('/')
         client = await self._get_client()
 
-        # Query applications with joined job details
+        # Query applications with joined job details and interviews
         res = await client.get(
-            f"{base_url}/rest/v1/applications?student_id=eq.{student_id}&select=id,job_id,stage,applied_at,stage_changed_at,next_action_at,jobs(id,title,company,location,work_mode,employment_type)&order=applied_at.desc",
+            f"{base_url}/rest/v1/applications?student_id=eq.{student_id}&select=id,job_id,stage,applied_at,stage_changed_at,next_action_at,jobs(id,title,company,location,work_mode,employment_type),interviews(id,scheduled_at,status)&order=applied_at.desc",
             headers=self._get_headers(),
         )
 
         if res.status_code != 200:
-            return []
+            logger.error("Failed to query student applications: status=%d text=%s", res.status_code, res.text)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve applications from database."
+            )
 
         summaries: List[ApplicationSummary] = []
         for row in res.json():
             job_info = row.get("jobs") or {}
+            raw_interviews = row.get("interviews") or []
+            has_interview = any(i.get("status") == "scheduled" for i in raw_interviews)
             summaries.append(
                 ApplicationSummary(
                     id=row["id"],
@@ -558,6 +616,7 @@ class StudentService:
                     applied_at=row["applied_at"],
                     stage_changed_at=row["stage_changed_at"],
                     next_action_at=row.get("next_action_at"),
+                    has_scheduled_interview=has_interview,
                 )
             )
 
@@ -681,10 +740,24 @@ class StudentService:
         )
         return res.status_code == 200
 
+    async def mark_all_notifications_read(self, student_id: str) -> bool:
+        """Marks all unread notifications for student as read."""
+        base_url = settings.SUPABASE_URL.rstrip('/')
+        client = await self._get_client()
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        res = await client.patch(
+            f"{base_url}/rest/v1/notifications?recipient_id=eq.{student_id}&read_at=is.null",
+            headers=self._get_headers(),
+            json={"read_at": now},
+        )
+        return res.status_code in (200, 204)
+
     async def get_dashboard_stats(self, student_id: str, email: str) -> StudentDashboardStats:
         """Aggregates all student dashboard metrics from real persisted database rows."""
-        # 1. Profile completion
+        # 1. Profile completion & Resume status
         profile = await self.get_candidate_profile(student_id, email)
+        has_resume = bool(profile.resume_path)
 
         # 2. Applications
         applications = await self.get_student_applications(student_id)
@@ -710,6 +783,18 @@ class StudentService:
         notifications = await self.get_student_notifications(student_id)
         unread_count = sum(1 for n in notifications if not n.read_at)
 
+        # 5. Top Recommended Jobs with Deterministic Match Scores
+        recommended_jobs = []
+        try:
+            jobs_page = await self.get_published_jobs(student_id=student_id, page=1, limit=12)
+            applied_ids = {a.job_id for a in applications}
+            unapplied = [j for j in jobs_page.items if j.id not in applied_ids]
+            # Sort by match score descending
+            unapplied.sort(key=lambda j: (j.match.score if j.match else 0), reverse=True)
+            recommended_jobs = unapplied[:3]
+        except Exception as e:
+            logger.warning("Could not fetch recommended jobs for dashboard: %s", str(e))
+
         return StudentDashboardStats(
             profile_completion_percentage=profile.completion_percentage,
             total_applications=len(applications),
@@ -718,6 +803,8 @@ class StudentService:
             recent_applications=applications[:5],
             upcoming_interviews=upcoming_interviews[:5],
             unread_notifications_count=unread_count,
+            recommended_jobs=recommended_jobs,
+            has_resume=has_resume,
         )
 
 

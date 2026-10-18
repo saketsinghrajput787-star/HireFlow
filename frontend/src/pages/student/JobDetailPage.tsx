@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import { JobItem } from '../../types';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Alert } from '../../components/Alert';
+import { MatchScoreBadge } from '../../components/MatchScoreBadge';
 import {
   Building,
   MapPin,
@@ -13,6 +14,8 @@ import {
   ArrowLeft,
   Send,
   Loader2,
+  Sparkles,
+  FileSearch,
 } from 'lucide-react';
 
 export const JobDetailPage: React.FC = () => {
@@ -135,6 +138,7 @@ export const JobDetailPage: React.FC = () => {
               <span className="capitalize px-2 py-0.5 rounded bg-slate-50 border border-slate-200 text-slate-600">
                 {job.experience_level.replace('_', ' ')}
               </span>
+              {job.match && <MatchScoreBadge match={job.match} size="sm" showPopover={false} />}
             </div>
           </div>
 
@@ -199,19 +203,73 @@ export const JobDetailPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Intelligent Candidate-Job Fit Analysis */}
+      {job.match && (
+        <div className="space-y-4">
+          <MatchScoreBadge match={job.match} size="detailed" />
+
+          {job.match.is_partial_profile && (
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Sparkles className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                <p className="text-xs text-amber-900 font-medium leading-relaxed">
+                  Notice: Your match score is an estimate because your candidate profile has empty skills or experience. Updating your profile helps recruiters discover you and produces more precise match ratings.
+                </p>
+              </div>
+              <Link
+                to="/student/profile"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-amber-900 bg-amber-200/70 hover:bg-amber-200 transition-colors whitespace-nowrap"
+              >
+                Update Profile &rarr;
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Resume Tailoring Action Card */}
+      <div className="p-5 rounded-2xl bg-gradient-to-r from-indigo-50/90 via-purple-50/50 to-indigo-50/90 border border-indigo-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-indigo-600/10 flex items-center justify-center text-indigo-700 flex-shrink-0">
+            <FileSearch className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-indigo-950">Resume Intelligence & Tailoring</h3>
+            <p className="text-xs text-indigo-800/80 mt-0.5">
+              Analyze your uploaded PDF resume against this role&apos;s requirements to spot missing keywords and get actionable tailoring tips.
+            </p>
+          </div>
+        </div>
+        <Link
+          to={`/student/resume-analysis?jobId=${job.id}`}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all whitespace-nowrap self-start sm:self-auto"
+        >
+          <Sparkles className="w-3.5 h-3.5" /> Tailor Resume for this Job &rarr;
+        </Link>
+      </div>
+
       {/* Required Skills Section */}
       {job.required_skills && job.required_skills.length > 0 && (
         <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-3">
           <h2 className="text-base font-bold text-slate-900">Required Skills & Technologies</h2>
           <div className="flex flex-wrap gap-2 pt-1">
-            {job.required_skills.map((skill, index) => (
-              <span
-                key={index}
-                className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-xs font-semibold"
-              >
-                {skill}
-              </span>
-            ))}
+            {job.required_skills.map((skill, index) => {
+              const isMatched = job.match?.matched_skills?.some(
+                (ms) => ms.toLowerCase() === skill.toLowerCase()
+              );
+              return (
+                <span
+                  key={index}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                    isMatched
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                      : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                  }`}
+                >
+                  {isMatched ? `✓ ${skill}` : skill}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}

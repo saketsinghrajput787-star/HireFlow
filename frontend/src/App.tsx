@@ -19,7 +19,11 @@ import { StudentApplicationsPage } from './pages/student/StudentApplicationsPage
 import { StudentApplicationDetailPage } from './pages/student/StudentApplicationDetailPage';
 import { StudentInterviewsPage } from './pages/student/StudentInterviewsPage';
 import { StudentNotificationsPage } from './pages/student/StudentNotificationsPage';
+import { StudentResumeAnalysisPage } from './pages/student/StudentResumeAnalysisPage';
 import { RecruiterDashboardPage } from './pages/recruiter/RecruiterDashboardPage';
+import { RecruiterJobsPage } from './pages/recruiter/RecruiterJobsPage';
+import { RecruiterApplicantsPage } from './pages/recruiter/RecruiterApplicantsPage';
+import { RecruiterInterviewsPage } from './pages/recruiter/RecruiterInterviewsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 export const App: React.FC = () => {
@@ -44,6 +48,7 @@ export const App: React.FC = () => {
                 </ProtectedRoute>
               }
             >
+              <Route index element={<Navigate to="/student/dashboard" replace />} />
               <Route path="dashboard" element={<StudentDashboardPage />} />
               <Route path="profile" element={<StudentProfilePage />} />
               <Route path="jobs" element={<JobDiscoveryPage />} />
@@ -52,18 +57,23 @@ export const App: React.FC = () => {
               <Route path="applications/:id" element={<StudentApplicationDetailPage />} />
               <Route path="interviews" element={<StudentInterviewsPage />} />
               <Route path="notifications" element={<StudentNotificationsPage />} />
+              <Route path="resume-analysis" element={<StudentResumeAnalysisPage />} />
             </Route>
 
             {/* Protected Recruiter Route Group */}
             <Route
-              path="recruiter/dashboard"
+              path="recruiter"
               element={
                 <ProtectedRoute allowedRoles={['recruiter', 'admin']}>
                   <DashboardLayout />
                 </ProtectedRoute>
               }
             >
-              <Route index element={<RecruiterDashboardPage />} />
+              <Route index element={<Navigate to="/recruiter/dashboard" replace />} />
+              <Route path="dashboard" element={<RecruiterDashboardPage />} />
+              <Route path="jobs" element={<RecruiterJobsPage />} />
+              <Route path="applicants" element={<RecruiterApplicantsPage />} />
+              <Route path="interviews" element={<RecruiterInterviewsPage />} />
             </Route>
 
             {/* 404 Route */}
