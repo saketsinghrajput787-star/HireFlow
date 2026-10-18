@@ -13,7 +13,7 @@
 DO $$
 DECLARE
     target_user_id UUID;
-    target_email TEXT := 'saket7@education.com'; -- Verified existing account in auth.users
+    target_email TEXT := 'saket77@gmail.com'; -- Recruiter account
 BEGIN
     -- Look up user ID from auth.users
     SELECT id INTO target_user_id
@@ -49,4 +49,4 @@ END $$;
 SELECT p.id, u.email, p.full_name, p.role, p.updated_at
 FROM public.profiles p
 JOIN auth.users u ON u.id = p.id
-WHERE u.email = 'saket7@education.com';
+WHERE u.email = 'saket77@gmail.com';
