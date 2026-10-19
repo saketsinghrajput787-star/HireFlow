@@ -1,120 +1,450 @@
-# HireFlow — Modern Applicant Tracking System (ATS)
-### Enterprise Talent Acquisition Platform with Smart Matching, Resume Intelligence & Follow-up Automation
+<div align="center">
 
-[![Backend Tests](https://img.shields.io/badge/pytest-66%20passed-brightgreen.svg)](backend/tests)
-[![TypeScript Build](https://img.shields.io/badge/TypeScript-clean%20build-blue.svg)](frontend)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](backend)
-[![React](https://img.shields.io/badge/React-18.3+-61dafb.svg)](frontend)
-[![Vite](https://img.shields.io/badge/Vite-6.4+-646CFF.svg)](frontend)
-[![PostgreSQL RLS](https://img.shields.io/badge/PostgreSQL-RLS%20Hardened-336791.svg)](database/migrations)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](backend)
+# 💼 HireFlow
+### Modern Applicant Tracking System (ATS) & Talent Acquisition Platform
+
+**A secure, full-stack recruitment platform connecting student talent with corporate hiring teams through deterministic matching, privacy-first resume intelligence, and automated interview workflows.**
+
+<br/>
+
+[![Live Deployment](https://img.shields.io/badge/Demo-hire--flow.vercel.app-4f46e5?style=for-the-badge&logo=vercel&logoColor=white)](https://hire-flow-beryl-one.vercel.app)
+[![API Documentation](https://img.shields.io/badge/API_Docs-Swagger_OpenAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://hireflow-giet.onrender.com/docs)
+[![API Health](https://img.shields.io/badge/API_Status-Operational-brightgreen?style=for-the-badge)](https://hireflow-giet.onrender.com/health)
+
+<br/>
+
+[![Backend Tests](https://img.shields.io/badge/Pytest-69%20Passed-2ea44f?style=flat-square&logo=pytest&logoColor=white)](backend/tests)
+[![Frontend Tests](https://img.shields.io/badge/Vitest-6%20Passed-6e9f18?style=flat-square&logo=vitest&logoColor=white)](frontend/src/pages/auth/__tests__)
+[![TypeScript Build](https://img.shields.io/badge/TypeScript-Strict_Clean-3178c6?style=flat-square&logo=typescript&logoColor=white)](frontend)
+[![Python](https://img.shields.io/badge/Python-3.10%2B_%7C_3.13-3776ab?style=flat-square&logo=python&logoColor=white)](backend)
+[![React](https://img.shields.io/badge/React-18.3-61dafb?style=flat-square&logo=react&logoColor=black)](frontend)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?style=flat-square&logo=fastapi&logoColor=white)](backend)
+[![PostgreSQL RLS](https://img.shields.io/badge/PostgreSQL-RLS_Hardened-336791?style=flat-square&logo=postgresql&logoColor=white)](database/migrations)
+[![License](https://img.shields.io/badge/License-MIT-purple?style=flat-square)](LICENSE)
+
+<br/>
+
+> **Portfolio & Internship Project Notice**: HireFlow was engineered as a comprehensive portfolio and talent-acquisition assignment project. It demonstrates modern full-stack development, defense-in-depth authorization, deterministic algorithm design, and microservices-ready cloud deployment.
+
+[Live Demo](https://hire-flow-beryl-one.vercel.app/) • [Swagger Docs](https://hireflow-giet.onrender.com/docs) • [API Health](https://hireflow-giet.onrender.com/health) • [Recruiter Demo Guide](docs/DEMO_GUIDE.md) • [System Architecture](docs/ARCHITECTURE.md) • [Deployment Guide](docs/DEPLOYMENT.md)
 
 ---
 
-## 1. Project Overview
+</div>
 
-**HireFlow** is a modern, enterprise-grade Applicant Tracking System (ATS) engineered to connect student talent with corporate hiring teams. Designed around strict security isolation, privacy-first resume parsing, and deterministic candidate-job matching, HireFlow empowers candidates to discover opportunities and tailor their resumes while enabling recruiters to manage hiring pipelines with automated follow-ups and transparent scorecards.
+## 📑 Table of Contents
 
-The platform provides two strictly separated, role-governed portals:
-1. **Student Portal** — Candidates build verified profiles, securely store PDF resumes in private cloud vaults, receive personalized job recommendations with transparent match scores, perform deep resume entity analysis, and track application stages.
-2. **Recruiter Portal** — Corporate recruiters publish job openings, review applicant pipelines with side-by-side match scorecards, evaluate candidates with time-limited signed resume access, schedule and reschedule interviews, record round feedback, and leverage an automated Follow-up Center.
+- [Overview](#-overview)
+- [Problem & Solution](#-problem--solution)
+- [Key Features](#-key-features)
+  - [Student Portal](#student-portal)
+  - [Recruiter Portal](#recruiter-portal)
+  - [Smart Candidate–Job Matching](#smart-candidatejob-matching)
+  - [In-House Resume Intelligence](#in-house-resume-intelligence)
+  - [Security & Defense-in-Depth](#security--defense-in-depth)
+- [Application Screenshots](#-application-screenshots)
+- [System Architecture](#-system-architecture)
+- [Technology Stack](#-technology-stack)
+- [Getting Started](#-getting-started)
+  - [Prerequisites](#prerequisites)
+  - [1. Database & Supabase Setup](#1-database--supabase-setup)
+  - [2. Backend Setup](#2-backend-setup)
+  - [3. Frontend Setup](#3-frontend-setup)
+- [Environment Variables](#-environment-variables)
+- [Testing & Quality Assurance](#-testing--quality-assurance)
+- [Production Deployment](#-production-deployment)
+- [Known Limitations](#-known-limitations)
+- [Future Enhancements](#-future-enhancements)
+- [Repository Structure](#-repository-structure)
+- [Contributing](#-contributing)
+- [License](#-license)
 
 ---
 
-## 2. Key Capabilities & Architecture
+## 💡 Overview
 
-```
-                    ┌──────────────────────────────────────────────┐
-                    │          React Frontend (Vite + TS)          │
-                    │  • /                      (Portal Gateway)   │
-                    │  • /student/dashboard     (Guarded Student)  │
-                    │  • /student/jobs          (Job Discovery)    │
-                    │  • /student/resume-analysis (Intelligence)   │
-                    │  • /recruiter/dashboard   (Enterprise RBAC)  │
-                    │  • /recruiter/applicants  (Pipeline & Match) │
-                    │  • /recruiter/interviews  (Coordination)     │
-                    └──────────────┬────────────────┬──────────────┘
-                                   │                │
-         Direct Supabase Auth JWT  │                │ Bearer Token
-         + Storage Upload (RLS)    │                │ (Strict RBAC Verification)
-                                   ▼                ▼
-         ┌──────────────────────────┐      ┌──────────────────────────┐
-         │      Supabase Cloud      │      │     FastAPI Backend      │
-         │  • Auth API (/auth/v1)   │◄─────┤  • Smart Match Engine    │
-         │  • PostgreSQL DB + RLS   │      │  • Local Resume Parser   │
-         │  • Private Bucket Resumes│      │  • Follow-up Intelligence│
-         └──────────────────────────┘      │  • Idempotent Reminders  │
-                                           └──────────────────────────┘
-```
+**HireFlow** is an enterprise-inspired Applicant Tracking System designed to streamline campus hiring and early-career talent acquisition. Unlike traditional job boards that overwhelm applicants and bury hiring teams under disorganized resumes, HireFlow delivers:
 
-### Phase 4A — Smart Candidate–Job Matching
-- **Deterministic Match Engine** (`backend/app/services/matching_service.py`): Calculates authoritative 0–100 candidate-job alignment scores:
-  - **Required Skills Overlap (50 pts max)**: Semantic normalization and alias mapping (e.g., `React.js` &rarr; `React`, `TS` &rarr; `TypeScript`, `K8s` &rarr; `Kubernetes`).
-  - **Role & Specialization Alignment (20 pts max)**: Keyword alignment across target roles, headlines, and work experience.
-  - **Location & Work-Mode (15 pts max)**: Remote accommodation, hybrid proximity, and candidate location matching.
-  - **Experience & Education (15 pts max)**: Seniority level weighting and credential verification.
-- **Fairness & Partial-Profile Handling**: Candidates with incomplete profiles receive neutral baselines rather than 0% or false mismatch accusations.
-- **Decision-Support Governance**: Every match rating is accompanied by transparent positive/negative factor explanations and an explicit human-in-the-loop notice.
+1. **Role-Separated Workspaces**: Dedicated portals for candidates and recruiters with zero cross-contamination.
+2. **Transparent Candidate Matching**: An explainable 0–100 deterministic scoring engine that breaks down skill, role, location, and seniority alignment.
+3. **Privacy-Preserving Resume Intelligence**: Zero-dependency, ephemeral PDF text extraction (`pypdf`) with entity detection and job tailoring advice.
+4. **Actionable Pipeline Management**: Recruiter Kanban-style stage management, interview scheduling, and a Follow-up Center detecting stale applications.
 
-### Phase 4B — Resume Intelligence & Tailoring
-- **Local PDF Text Extraction**: Uses pure-Python `pypdf` with zero dependency on external paid AI APIs. Resume text is processed ephemerally and never permanently logged.
-- **Entity Detection**: Automatically detects skills, degree levels, fields of study, graduation dates, work experiences, project titles, and professional certifications.
-- **Scanned Document Detection**: Multi-page PDFs yielding < 40 characters of extractable text are flagged with `is_scanned_or_empty: True` along with actionable guidance to re-export as a searchable PDF.
-- **Profile vs. Resume Discrepancies**: Compares extracted resume data against saved profile data to highlight discrepancies without mutating candidate records.
-- **Job-Specific Tailoring**: Compares resume text against published job descriptions, highlighting required skills found, skills not detected, and concrete tailoring tips.
+---
 
-### Phase 4C — Follow-up Intelligence & Automated Reminders
-- **Recruiter Follow-up Center**: Dedicated dashboard identifying:
-  - Unreviewed newly submitted applications (`stage == 'applied'`).
-  - Stale applications exceeding stage thresholds (`applied` > 3 days, `screening` > 5 days, `interview` > 5 days, `offer` > 7 days).
-  - Upcoming interviews in the next 24–48 hours (highlighting <= 24 hours as High Priority).
+## 🎯 Problem & Solution
+
+| The Recruitment Challenge | How HireFlow Solves It |
+| :--- | :--- |
+| **Manual, Disjointed Workflows**<br/>Recruiters juggle resumes across email inboxes, spreadsheets, and calendar links. | **Centralized Workspace**<br/>End-to-end management from job publication to applicant evaluation, stage progression, and round feedback. |
+| **The "Black Box" Application Void**<br/>Students submit resumes into automated filters without understanding why they were matched or rejected. | **Explainable Match Scoring**<br/>Deterministic 0–100 match ratings with side-by-side lists of matched skills, missing requirements, and positive/negative factors. |
+| **Privacy Leaks & Data Exposure**<br/>Resumes stored in public cloud buckets or transmitted insecurely expose sensitive candidate data. | **Hardened Cloud Storage**<br/>Private Supabase Storage with 300-second expiring signed URLs and PostgreSQL Row Level Security (RLS). |
+| **Stale Candidates & Missed Interviews**<br/>Hiring teams lose top candidates due to delayed reviews and forgotten interview rounds. | **Follow-up Intelligence Center**<br/>Automated dashboard alerts for applications pending beyond SLA thresholds and scheduled interview rounds. |
+
+---
+
+## ✨ Key Features
+
+### Student Portal
+- **Streamlined Authentication**: Email/password registration forced to the `student` role by database triggers.
+- **Dynamic Candidate Profile**: Profile completion progress tracker (0–100%), headline, contact details, education, technical skills, and work experience.
+- **Private PDF Vault**: Encrypted resume upload stored in private cloud storage, isolated to candidate ownership.
+- **Job Discovery & Real-Time Filtering**: Search by job title, company, or technology skill, with filters for work mode (Remote/Hybrid/Onsite), employment type, and experience level.
+- **Deterministic Match Badges**: Every job card dynamically displays candidate match percentage and alignment level.
+- **Job-Specific Resume Tailoring**: Compares resume text directly against job descriptions to highlight missing keywords and actionable tailoring tips.
+- **Application Tracking**: Real-time status tracker across pipeline stages (`applied`, `screening`, `interview`, `offer`, `hired`, `rejected`).
+- **In-App Notification Center**: Unread alert counter, filterable tabs, and direct links to updated applications and interview schedules.
+
+### Recruiter Portal
+- **Enterprise-Gated Access**: Restricted entry point requiring administrative database provisioning; student tokens receive instant `403 Forbidden` rejection.
+- **Job Management**: Create, edit, publish, and close job postings with structured skill requirements, salary brackets, and work-mode specifications.
+- **Scoped Applicant Pipeline**: Recruiters can only access candidates who applied to their own job listings.
+- **Time-Limited Resume Access**: Resumes are reviewed through 300-second expiring signed URLs, ensuring zero public exposure.
+- **Pipeline Stage Progression**: Transition candidates across stages with automated audit logging and candidate notification triggers.
+- **Interview Coordination**: Schedule rounds (screening, technical, behavioral, executive), set meeting formats, and record round notes.
+- **Follow-up Intelligence Center**: Dedicated dashboard widget identifying:
+  - Unreviewed new applications (`applied` stage).
+  - Stale applications exceeding stage SLAs (`applied` > 3d, `screening` > 5d, `interview` > 5d, `offer` > 7d).
+  - Upcoming interviews in the next 24–48 hours (highlighting <= 24h as High Priority).
   - Completed interviews with missing interviewer feedback.
-  - Low-volume job postings (< 2 applicants after 3 days).
-- **Automated Interview Reminder Lifecycle**: Scans scheduled interviews occurring within 48 hours and idempotently delivers student in-app notifications without creating duplicates across repeated runs.
-- **Notification Hub**: Full student notifications center with "Mark all as read" (`POST /api/student/notifications/read-all`), unread filter tabs, contextual icon badges, and direct application links.
+- **On-Demand Reminder Scan**: Recruiter-triggered idempotent background scanner (`POST /api/recruiter/follow-ups/process-reminders`) that delivers student interview notifications without duplicates.
 
-### Phase 4D — Hiring Insights & Dashboard Integration
-- **Student Dashboard**: Real-time stage distribution, outstanding action alerts (e.g., missing resume), upcoming rounds, and top recommended jobs with match badges.
-- **Recruiter Dashboard**: 6-metric KPI row, pipeline stage distribution visual breakdown, and embedded Follow-up Intelligence widget with on-demand reminder runner.
+### Smart Candidate–Job Matching
+Built inside [`backend/app/services/matching_service.py`](backend/app/services/matching_service.py):
+- **Deterministic 0–100 Score**:
+  - **Required Skills Overlap (50 pts max)**: Evaluates candidate skills against job requirements using alias mapping (e.g., `React.js` &rarr; `React`, `TS` &rarr; `TypeScript`, `K8s` &rarr; `Kubernetes`).
+  - **Role & Specialization Alignment (20 pts max)**: Matches candidate target role and headline against job titles.
+  - **Location & Work Mode (15 pts max)**: Rewards remote flexibility and geographic proximity.
+  - **Experience & Education (15 pts max)**: Verifies seniority levels and credentials.
+- **Partial-Profile Graceful Handling**: Candidates with incomplete profiles receive an objective baseline with guidance to complete their profile rather than an unjustified 0% score.
+- **Ethical Human-in-the-Loop Design**: Explicitly serves as decision support for human hiring managers and never makes automated rejection decisions.
 
----
+### In-House Resume Intelligence
+Built inside [`backend/app/services/resume_intelligence_service.py`](backend/app/services/resume_intelligence_service.py):
+- **Pure-Python PDF Extraction**: In-memory text extraction using `pypdf` with zero external paid AI API dependencies.
+- **Entity Detection**: Automatically identifies programming languages, frameworks, degrees, graduation dates, and work history.
+- **Corrupt & Scanned PDF Guardrail**: Flags multi-page PDFs with < 40 characters of extracted text as scanned images (`is_scanned_or_empty: True`) and prompts candidates to provide searchable text.
+- **Profile Discrepancy Highlighting**: Spots differences between extracted resume text and profile form entries without overwriting user data.
 
-## 3. Technology Stack
-
-### Frontend
-- **Framework**: React 18.3 with Vite 6.4
-- **Language**: TypeScript 5.8
-- **Styling**: Tailwind CSS with custom SaaS light/dark aesthetic and micro-animations
-- **Routing**: React Router 7
-- **Icons**: Lucide React
-- **Auth Client**: Official Supabase JS SDK (`@supabase/supabase-js`)
-
-### Backend
-- **Framework**: FastAPI (Python 3.10+)
-- **Server**: Uvicorn ASGI
-- **Validation**: Pydantic v2 & `pydantic-settings`
-- **PDF Extraction**: `pypdf` 5.0+ (pure-Python, lightweight, local)
-- **HTTP Client**: HTTPX (async)
-- **Testing**: Pytest & `pytest-asyncio`
-
-### Database & Storage
-- **Database**: Supabase PostgreSQL 15+
-- **Security**: PostgreSQL Row-Level Security (RLS) & Security Definer helper functions
-- **Private Storage**: Supabase Storage bucket `resumes` (`{student_id}/resume.pdf`) with short-lived signed URLs (300s expiry)
+### Security & Defense-in-Depth
+- **PostgreSQL Row Level Security (RLS)**: Enforced across all 7 database tables. Standard database clients cannot query unauthorized rows.
+- **Immutable Roles**: The database trigger `prevent_profile_role_tampering()` prevents users from updating their own role column.
+- **Zero-Trust Backend Verification**: The FastAPI dependency cryptographically verifies tokens against Supabase Auth before checking PostgreSQL `public.profiles` for authoritative roles.
+- **Recruiter Job Scoping**: Every backend modification confirms `job.recruiter_id == current_user.id`.
 
 ---
 
-## 4. Security & Role-Based Access Control (RBAC)
+## 📸 Application Screenshots
 
-1. **Strict Role Separation**: Public signups (`/student/signup`) are forced to role `student` by a PostgreSQL trigger (`handle_new_auth_user()`). Client-injected roles are discarded.
-2. **Immutable Roles**: The database trigger `prevent_profile_role_tampering()` prevents users from elevating their own privileges.
-3. **Recruiter Gating**: Logging into `/recruiter/login` immediately calls FastAPI `/api/recruiter-check`. Student tokens receive `403 Forbidden` and are signed out immediately.
-4. **Ownership Verification**: All recruiter actions (viewing candidates, updating stages, scheduling interviews, downloading resumes) verify job ownership against the authenticated recruiter ID.
-5. **Private Resume Vault**: Resumes can only be downloaded by the candidate owner or by an authorized recruiter reviewing an active application for their job.
+### Public Experience & Architecture Verification
+
+| Landing Page & Live Backend Status | Gated Recruiter Sign-In |
+| :---: | :---: |
+| ![HireFlow Landing Page](docs/screenshots/landing-page.png) | ![Recruiter Gated Login](docs/screenshots/recruiter-login.png) |
+| *Hero section with live backend operational health badge and role-separated entry points.* | *Restricted recruiter portal sign-in featuring zero-trust enterprise notice.* |
 
 ---
 
-## 5. Repository Structure
+### Student Experience & Smart Matching
+
+| Candidate Dashboard & Profile Progress | Job Discovery & Match Badges |
+| :---: | :---: |
+| ![Student Dashboard](docs/screenshots/student-dashboard.png) | ![Student Job Discovery](docs/screenshots/student-job-discovery.png) |
+| *Profile completion progress (15%), missing resume alert, stage overview, and recommended jobs.* | *Searchable job catalog with work-mode filters, required skills, and dynamic match tags.* |
+
+| Deterministic Match Scorecard | Resume Intelligence & Tailoring |
+| :---: | :---: |
+| ![Job Detail & Match Scorecard](docs/screenshots/job-details-matching.png) | ![Resume Intelligence](docs/screenshots/resume-intelligence.png) |
+| *Detailed 0–100 match scorecard, matched skills, missing requirements, and human-in-the-loop notice.* | *In-house PDF text parsing, section health checks, and role-specific tailoring tips.* |
+
+| Candidate Profile Builder & Vault | In-App Notification Center |
+| :---: | :---: |
+| ![Candidate Profile](docs/screenshots/student-profile.png) | ![Student Notifications](docs/screenshots/student-notifications.png) |
+| *Personal details, private PDF resume vault, technical skills tags, and education credentials.* | *Real-time application updates, interview alerts, and unread notification tracking.* |
+
+> [!NOTE]
+> Recruiter dashboard views (applicant pipeline, candidate detail review, and follow-up center) require an admin-provisioned recruiter account in Supabase. See [database/provision_recruiter.sql](database/provision_recruiter.sql) for provisioning instructions.
+
+---
+
+## 🏗️ System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Client["Frontend Client (React 18 + TypeScript + Vite)"]
+        Landing["Landing Page (/)"]
+        StudentPortal["Student Portal (/student/*)<br/>• Job Discovery & Matching<br/>• Resume Tailoring<br/>• Application Tracking"]
+        RecruiterPortal["Recruiter Portal (/recruiter/*)<br/>• Applicant Pipeline Kanban<br/>• Interview Coordination<br/>• Follow-Up Intelligence"]
+        AuthContext["Auth Context & Token Manager"]
+    end
+
+    subgraph Backend["Backend API (FastAPI + Python 3.10+)"]
+        API["FastAPI / Uvicorn ASGI Server"]
+        AuthDep["RBAC Security Dependency"]
+        MatchEngine["Deterministic Match Engine<br/>(0–100 Alignment Math)"]
+        ResumeParser["Local Resume Parser<br/>(pypdf In-Memory Engine)"]
+        FollowUpService["Follow-Up & Reminder Service<br/>(Idempotent Scanner)"]
+    end
+
+    subgraph SupabaseCloud["Supabase Managed Cloud Platform"]
+        AuthAPI["Supabase Auth API (/auth/v1)"]
+        PostgresDB[("PostgreSQL 15+<br/>• 7 Core Tables<br/>• Row-Level Security (RLS)<br/>• Defensive Triggers")]
+        StorageVault[("Private Storage ('resumes')<br/>• Encrypted PDF Vault<br/>• 300s Signed URLs")]
+    end
+
+    StudentPortal --> AuthContext
+    RecruiterPortal --> AuthContext
+    AuthContext -->|1. Direct Sign-In / Sign-Up| AuthAPI
+    AuthContext -->|2. Bearer JWT on Protected Requests| API
+    API --> AuthDep
+    AuthDep -->|3. Verify Token Cryptographically| AuthAPI
+    AuthDep -->|4. Resolve Authoritative Role| PostgresDB
+    MatchEngine --> PostgresDB
+    ResumeParser --> StorageVault
+    FollowUpService --> PostgresDB
+    StudentPortal -.->|Direct Query with JWT & RLS| PostgresDB
+    StudentPortal -.->|Upload PDF Resume with RLS| StorageVault
+```
+
+For complete technical specifications, review [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technology | Decision Rationale |
+| :--- | :--- | :--- |
+| **Frontend Framework** | React 18.3 + Vite 6 | Rapid hot module replacement, predictable state rendering, and optimized production bundle compilation. |
+| **Language (Frontend)** | TypeScript 5.8 | End-to-end type safety across API response contracts, application states, and UI components. |
+| **Styling** | Tailwind CSS | Utility-first CSS providing a consistent SaaS color scheme (indigo, violet, slate), dark accents, and responsive layouts. |
+| **Icons** | Lucide React | Lightweight, consistent iconography for status indicators, pipeline stages, and navigation. |
+| **Backend Framework** | FastAPI (Python 3.10+) | High-performance asynchronous execution, automatic OpenAPI schema generation, and native Pydantic validation. |
+| **Validation** | Pydantic v2 | Strict type validation for incoming payloads, environment settings, and outbound schema transformation. |
+| **PDF Extraction** | `pypdf` 5.0+ | Pure-Python, in-memory text parsing that avoids expensive third-party AI APIs and preserves candidate privacy. |
+| **Database** | Supabase PostgreSQL 15+ | Relational data integrity, native Row-Level Security (RLS), and database triggers for automated audit logging. |
+| **Authentication** | Supabase Auth | Secure JWT issuance, refresh token rotation, and password hashing. |
+| **Storage** | Supabase Storage | Private, encrypted PDF bucket with short-lived signed download URLs (300 seconds). |
+| **Testing** | Pytest + Vitest | Comprehensive backend unit/integration tests (69 tests) and frontend component regression tests. |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- **Node.js**: `>= 18.0.0` (Verified on Node 22)
+- **Python**: `>= 3.10.0` (Verified on Python 3.13)
+- **Supabase Account**: Free project tier at [supabase.com](https://supabase.com)
+
+---
+
+### 1. Database & Supabase Setup
+1. In your Supabase Dashboard, navigate to the **SQL Editor**.
+2. Run the migration scripts sequentially from `database/migrations/`:
+   ```sql
+   -- 1. Tables, foreign keys, and role enforcement triggers
+   database/migrations/001_initial_schema.sql
+
+   -- 2. Row Level Security policies across all tables
+   database/migrations/002_row_level_security.sql
+
+   -- 3. Private 'resumes' storage bucket and access policies
+   database/migrations/003_storage.sql
+
+   -- 4. Audit logging and status change notification triggers
+   database/migrations/004_student_portal_enhancements.sql
+
+   -- 5. Recruiter compensation and currency schema updates
+   database/migrations/005_recruiter_portal_enhancements.sql
+   ```
+3. *(Optional)* Populate sample jobs:
+   ```sql
+   database/seed_jobs.sql
+   ```
+4. Configure Authentication in **Authentication &rarr; URL Configuration**:
+   - **Site URL**: `http://localhost:5173`
+   - **Redirect URLs**: `http://localhost:5173/**`
+
+---
+
+### 2. Backend Setup
+
+```bash
+# Navigate to the backend directory
+cd backend
+
+# Create and activate Python virtual environment
+# Windows PowerShell:
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# macOS / Linux:
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create environment file from template
+cp .env.example .env
+```
+
+Configure `backend/.env`:
+```ini
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+HOST=0.0.0.0
+PORT=8000
+ENVIRONMENT=development
+```
+
+Start the FastAPI development server:
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+- API Endpoint: `http://localhost:8000`
+- Interactive OpenAPI Docs: `http://localhost:8000/docs`
+- Health Endpoint: `http://localhost:8000/health`
+
+---
+
+### 3. Frontend Setup
+
+In a new terminal window:
+
+```bash
+# Navigate to the frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Create environment file from template
+cp .env.example .env.local
+```
+
+Configure `frontend/.env.local`:
+```ini
+VITE_API_BASE_URL=http://localhost:8000
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+```
+
+Start the Vite development server:
+```bash
+npm run dev
+```
+Open your browser at `http://localhost:5173`.
+
+---
+
+## 🔐 Environment Variables
+
+### Frontend (`frontend/.env.local`)
+Variables with `VITE_` are bundled into the client application. **Never place secrets here.**
+
+| Variable | Required | Exposure | Description |
+| :--- | :---: | :--- | :--- |
+| `VITE_API_BASE_URL` | Yes | Public Client | Base URL for FastAPI backend (e.g., `http://localhost:8000`) |
+| `VITE_SUPABASE_URL` | Yes | Public Client | Your Supabase project URL (`https://<id>.supabase.co`) |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Yes | Public Client | Supabase publishable/anon key for browser client |
+
+### Backend (`backend/.env`)
+Backend variables are strictly server-side and must never be exposed.
+
+| Variable | Required | Exposure | Description |
+| :--- | :---: | :--- | :--- |
+| `SUPABASE_URL` | Yes | Server Only | Supabase project API base URL |
+| `SUPABASE_PUBLISHABLE_KEY` | Yes | Server Only | Anon key used for Supabase Auth token validation |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | **Secret** | Supabase service-role secret key (administrative queries only) |
+| `CORS_ORIGINS` | Yes | Server Only | Comma-separated list of allowed frontend origins |
+| `HOST` | No | Server Only | Host binding address (default: `0.0.0.0`) |
+| `PORT` | No | Server Only | Server listening port (default: `8000`) |
+| `ENVIRONMENT` | No | Server Only | Runtime environment (`development`, `test`, `production`) |
+
+---
+
+## 🧪 Testing & Quality Assurance
+
+HireFlow maintains high test coverage across critical security boundaries, matching logic, and application flows.
+
+### Backend Automated Test Suite (Pytest)
+```bash
+# Run all backend tests from the project root
+.\.venv\Scripts\python.exe -m pytest backend/tests -v
+```
+**Verification Result**:
+- **69 tests passed** in 3.68s (100% pass rate).
+- Test areas:
+  - `test_auth.py`: Token verification, role resolution, recruiter gate checks.
+  - `test_matching.py`: Scoring arithmetic, skill aliases, location weighting, incomplete profile baselines.
+  - `test_resume_intelligence.py`: PDF text extraction, entity detection, corrupt & scanned document guardrails.
+  - `test_follow_up_and_notifications.py`: SLA threshold triggers, interview scanner, idempotency verification.
+  - `test_jobs_and_applications.py`: Job listings, single-application enforcement, stage transitions.
+  - `test_recruiter.py`: Ownership isolation, candidate review, signed resume URL generation.
+  - `test_student_profile.py`: Profile completion math, field validation.
+  - `test_health.py`: Operational status checks.
+
+### Frontend Component Tests (Vitest)
+```bash
+# Run frontend test suite
+npm --prefix frontend test
+```
+**Verification Result**:
+- **6 tests passed** (auth redirects, protected routes, and signup regressions).
+
+### Frontend Production Build
+```bash
+# Verify TypeScript compilation and Vite bundling
+npm --prefix frontend run build
+```
+**Verification Result**:
+- `tsc && vite build` completed cleanly with **zero TypeScript errors**.
+
+### Live API Health Check
+```bash
+curl https://hireflow-giet.onrender.com/health
+# Response: {"status":"ok","service":"hireflow-backend","version":"1.0.0","database_configured":true}
+```
+
+---
+
+## 🌐 Production Deployment
+
+| Service | Host | Root Directory | Build / Start Command |
+| :--- | :--- | :--- | :--- |
+| **Frontend** | [Vercel](https://vercel.com) | `frontend` | Build: `npm run build` &bull; Output: `dist` |
+| **Backend** | [Render](https://render.com) | `backend` | Build: `pip install -r requirements.txt`<br/>Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| **Database & Auth** | [Supabase](https://supabase.com) | `database` | SQL Migrations `001` through `005` |
+
+For production setup details and SPA routing rules, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+---
+
+## ⚠️ Known Limitations
+
+In the spirit of engineering transparency, the current implementation has the following known boundaries:
+1. **Manual / Triggered Reminder Scan**: The interview reminder scanner runs on-demand via the recruiter dashboard or via manual CLI/cron invocation (`python -m app.services.follow_up_service`). A persistent 24/7 background worker is not configured on the free hosting tier.
+2. **In-App Notifications Only**: Real-time notifications are delivered through the in-app notification center; external email (SendGrid/Resend) and SMS (Twilio) channels are not yet connected.
+3. **Calendar Integrations**: Meeting links and calendar invites are recorded manually by recruiters; direct two-way Google Calendar or Outlook synchronization is not yet integrated.
+4. **Text-Only PDF Parsing**: The resume parser uses pure-Python `pypdf`. Image-only or non-OCR scanned PDFs yield no extractable text and trigger the scanned document advisory.
+5. **Live End-to-End Scope**: Automated tests thoroughly validate business logic and security policies; full end-to-end browser tests against live production databases remain an ongoing QA milestone.
+
+---
+
+## 🔮 Future Enhancements
+
+- [ ] **Automated Cron Trigger**: Lightweight GitHub Actions scheduled workflow to trigger the interview reminder endpoint hourly at zero cost.
+- [ ] **Transactional Email Notifications**: Integration with Resend or SendGrid for application stage change and interview alert emails.
+- [ ] **Calendar Synchronization**: One-click Google Calendar / Microsoft Outlook invite creation with automated Google Meet or Zoom links.
+- [ ] **OCR Resume Support**: Optional Tesseract or cloud OCR pipeline for image-only PDF resumes.
+- [ ] **Multi-Recruiter Teams**: Company-level workspaces allowing multiple recruiters to collaborate on shared job postings.
+- [ ] **Candidate Resume Versioning**: Ability for candidates to maintain tailored resume versions for different job families.
+
+---
+
+## 📁 Repository Structure
 
 ```
 HireFlow/
@@ -122,194 +452,78 @@ HireFlow/
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── routes/
-│   │   │   │   ├── auth.py                  # Token verification & recruiter-check
-│   │   │   │   ├── health.py                # Service health status
-│   │   │   │   ├── jobs.py                  # Published job discovery & application
-│   │   │   │   ├── recruiter.py             # Recruiter workspace & follow-up center
-│   │   │   │   └── student.py               # Student profile, resume analysis & notifications
-│   │   │   └── deps.py                      # Bearer auth & RBAC dependencies
+│   │   │   │   ├── auth.py                  # Token verification & recruiter gate check
+│   │   │   │   ├── health.py                # Operational health endpoint
+│   │   │   │   ├── jobs.py                  # Published job discovery & application submission
+│   │   │   │   ├── recruiter.py             # Recruiter pipeline, candidates, interviews & follow-ups
+│   │   │   │   └── student.py               # Profile builder, resume analysis & notifications
+│   │   │   └── deps.py                      # Zero-trust Bearer auth & RBAC dependencies
 │   │   ├── core/
-│   │   │   ├── config.py                    # Environment settings
-│   │   │   └── security.py                  # Bearer extraction & sanitizing logger
-│   │   ├── schemas/
-│   │   │   ├── applications.py              # Application and interview models
-│   │   │   ├── auth.py                      # User profiles & role definitions
-│   │   │   ├── follow_up.py                 # Follow-up center & reminder models
-│   │   │   ├── jobs.py                      # Job listing & response schemas
-│   │   │   ├── matching.py                  # Phase 4A JobMatchScore schema
-│   │   │   ├── recruiter.py                 # Recruiter applicant and dashboard schemas
-│   │   │   ├── resume_intelligence.py       # Phase 4B detected entities & section health
-│   │   │   └── student_dashboard.py         # Student dashboard and notification schemas
+│   │   │   ├── config.py                    # Pydantic BaseSettings environment loader
+│   │   │   └── security.py                  # Token extraction & sanitizing logger
+│   │   ├── schemas/                         # Pydantic request/response models
 │   │   ├── services/
-│   │   │   ├── follow_up_service.py         # Follow-up aggregation & reminder runner
+│   │   │   ├── follow_up_service.py         # Follow-up center & interview reminder scanner
 │   │   │   ├── matching_service.py          # Deterministic candidate-job matching engine
-│   │   │   ├── recruiter_service.py         # Recruiter pipeline and interview management
-│   │   │   ├── resume_intelligence_service.py # In-house PDF text extraction and parsing
-│   │   │   ├── student_service.py           # Student profile builder & applications
-│   │   │   └── supabase_auth.py             # Supabase Auth integration
-│   │   └── main.py                          # FastAPI ASGI entrypoint
-│   ├── tests/
-│   │   ├── test_auth.py                     # Auth & RBAC security tests
-│   │   ├── test_follow_up_and_notifications.py # Follow-up, reminders & idempotency tests
-│   │   ├── test_health.py                   # Health endpoint tests
-│   │   ├── test_jobs_and_applications.py    # Job discovery & application tests
-│   │   ├── test_matching.py                 # Matching algorithm & scoring tests
-│   │   ├── test_recruiter.py                # Recruiter workspace & ownership tests
-│   │   ├── test_resume_intelligence.py      # PDF parsing, corruption & boundary tests
-│   │   └── test_student_profile.py          # Profile completeness tests
-│   ├── render.yaml                          # Render deployment configuration
-│   ├── requirements.txt                     # Backend dependencies
-│   └── .env.example                         # Backend environment template
+│   │   │   ├── recruiter_service.py         # Recruiter pipeline & interview management
+│   │   │   ├── resume_intelligence_service.py # Pure-Python PDF text extraction & tailoring
+│   │   │   └── student_service.py           # Student profile & application operations
+│   │   └── main.py                          # FastAPI ASGI application entrypoint
+│   ├── tests/                               # Pytest test suite (69 tests)
+│   ├── render.yaml                          # Render Web Service deployment blueprint
+│   ├── requirements.txt                     # Backend Python dependencies
+│   └── .env.example                         # Backend environment configuration template
 ├── frontend/
 │   ├── src/
-│   │   ├── components/                      # Navbar, MatchScoreBadge, Alert, LoadingSpinner
-│   │   ├── layouts/                         # DashboardLayout
+│   │   ├── components/                      # UI components (Navbar, Alert, MatchScoreBadge)
+│   │   ├── layouts/                         # DashboardLayout and portal wrappers
 │   │   ├── pages/
 │   │   │   ├── auth/                        # StudentLogin, StudentSignup, RecruiterLogin
-│   │   │   ├── recruiter/                   # RecruiterDashboardPage, RecruiterJobsPage,
-│   │   │   │                                # RecruiterApplicantsPage, RecruiterInterviewsPage
-│   │   │   ├── student/                     # StudentDashboardPage, JobDiscoveryPage,
-│   │   │   │                                # JobDetailPage, StudentApplicationsPage,
-│   │   │   │                                # StudentResumeAnalysisPage, StudentNotificationsPage,
-│   │   │   │                                # StudentProfilePage
-│   │   │   ├── LandingPage.tsx              # Public landing page
-│   │   │   └── NotFoundPage.tsx             # 404 handler
+│   │   │   ├── recruiter/                   # Dashboard, Jobs, Applicants, Interviews
+│   │   │   ├── student/                     # Dashboard, Jobs, Detail, Applications, Resume, Notifications
+│   │   │   └── LandingPage.tsx              # Public home page with system health indicator
 │   │   ├── hooks/                           # useAuth hook & AuthContext
-│   │   ├── services/                        # api.ts (FastAPI) & storage.ts (Supabase)
-│   │   ├── types/                           # TypeScript interfaces
-│   │   ├── App.tsx                          # Application routes
-│   │   └── main.tsx                         # DOM entrypoint
-│   ├── package.json                         # Frontend dependencies
+│   │   ├── services/                        # api.ts (FastAPI) & supabase.ts / storage.ts
+│   │   ├── types/                           # TypeScript interfaces & API contracts
+│   │   └── App.tsx                          # Protected route routing definitions
+│   ├── package.json                         # Frontend dependencies & scripts
 │   ├── vite.config.ts                       # Vite build configuration
-│   └── .env.example                         # Frontend environment template
+│   ├── vercel.json                          # Vercel SPA rewrite rules
+│   └── .env.example                         # Frontend environment configuration template
 ├── database/
-│   ├── migrations/
-│   │   ├── 001_initial_schema.sql           # Schema, tables, triggers
-│   │   ├── 002_row_level_security.sql       # RLS policies across all tables
-│   │   ├── 003_storage.sql                  # Private 'resumes' bucket setup
-│   │   ├── 004_student_portal_enhancements.sql # Logging and stage change triggers
-│   │   └── 005_recruiter_portal_enhancements.sql # Compensation schema update
-│   ├── provision_recruiter.sql              # Recruiter provisioning script
-│   └── seed_jobs.sql                        # Demonstration job postings
-├── .gitignore
-└── README.md
+│   ├── migrations/                          # Sequential PostgreSQL migrations (001–005)
+│   ├── provision_recruiter.sql              # Recruiter role elevation script
+│   └── seed_jobs.sql                        # Demonstration corporate job listings
+├── docs/
+│   ├── screenshots/                         # Real application screenshots
+│   ├── ARCHITECTURE.md                      # Comprehensive system architecture & RLS matrix
+│   ├── DEMO_GUIDE.md                        # 2 to 3-minute recruiter demo walkthrough
+│   ├── DEPLOYMENT.md                        # Production deployment guide
+│   └── setup_guide.md                       # Detailed local developer setup guide
+├── .gitignore                               # Git ignore rules (.env, .venv, node_modules)
+├── LICENSE                                  # MIT License
+└── README.md                                # Project presentation & technical documentation
 ```
 
 ---
 
-## 6. Quick Start & Local Setup
+## 🤝 Contributing
 
-### Prerequisites
-- **Node.js** 18+ and **npm**
-- **Python** 3.10+ (Python 3.13 supported)
-- A free **Supabase** account ([supabase.com](https://supabase.com))
-
-### 1. Database Setup (Supabase)
-1. In your Supabase project, navigate to the **SQL Editor**.
-2. Run the migration scripts in numerical order:
-   - `database/migrations/001_initial_schema.sql`
-   - `database/migrations/002_row_level_security.sql`
-   - `database/migrations/003_storage.sql`
-   - `database/migrations/004_student_portal_enhancements.sql`
-   - `database/migrations/005_recruiter_portal_enhancements.sql`
-3. Optional: Run `database/seed_jobs.sql` to populate sample corporate job postings.
-
-### 2. Backend Setup
-```bash
-# Navigate to backend
-cd backend
-
-# Create and activate virtual environment
-python -m venv .venv
-
-# Windows PowerShell:
-.\.venv\Scripts\Activate.ps1
-# macOS / Linux:
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
-```
-
-Configure `backend/.env`:
-```ini
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-supabase-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
-PORT=8000
-ENVIRONMENT=development
-```
-
-Run the backend server:
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-API Documentation: `http://localhost:8000/docs`
-
-### 3. Frontend Setup
-```bash
-# Navigate to frontend (in a separate terminal)
-cd frontend
-
-# Install dependencies
-npm install
-
-# Configure environment
-cp .env.example .env.local
-```
-
-Configure `frontend/.env.local`:
-```ini
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-VITE_API_BASE_URL=http://localhost:8000
-```
-
-Start the frontend development server:
-```bash
-npm run dev
-```
-Access the application at: `http://localhost:5173`
+Contributions, issues, and feature requests are welcome!
+1. Fork the project.
+2. Create your feature branch (`git checkout -b feature/amazing-feature`).
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`).
+4. Push to the branch (`git push origin feature/amazing-feature`).
+5. Open a Pull Request.
 
 ---
 
-## 7. Automated Testing
+## 📄 License
 
-### Backend Test Suite (Pytest)
-The test suite covers authentication, role authorization, deterministic matching, PDF resume text extraction, corrupt file handling, notification dispatch, recruiter follow-ups, and reminder idempotency.
-
-```bash
-# Run all 66 tests
-pytest backend/tests
-```
-**Current Status**: `66 passed in 1.09s` (100% pass rate).
-
-### Frontend Production Build (TypeScript + Vite)
-```bash
-npm --prefix frontend run build
-```
-**Current Status**: Clean compilation with zero TypeScript errors.
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 8. Automated Follow-up & Reminder Automation
-
-The automated reminder lifecycle can run via any of the following mechanisms:
-
-1. **CLI / Cron Job** (Recommended for Render or GitHub Actions):
-   ```bash
-   python -m app.services.follow_up_service
-   ```
-2. **On-Demand Recruiter Action**:
-   Recruiters can trigger an immediate reminder scan via the "Run Reminder Scan" button on the Recruiter Dashboard (`POST /api/recruiter/follow-ups/process-reminders`).
-3. **Scheduled Webhook**:
-   Automated hourly cron trigger pinging `POST /api/recruiter/follow-ups/process-reminders`.
-
----
-
-## 9. License
-
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+<div align="center">
+  <sub>Built by <strong>Saket Singh Rajput</strong> • Designed for modern talent acquisition and campus hiring.</sub>
+</div>
