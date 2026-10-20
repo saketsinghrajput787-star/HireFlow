@@ -13,7 +13,7 @@
 
 <br/>
 
-[![Backend Tests](https://img.shields.io/badge/Pytest-74%20Passed-2ea44f?style=flat-square&logo=pytest&logoColor=white)](backend/tests)
+[![Backend Tests](https://img.shields.io/badge/Pytest-75%20Passed-2ea44f?style=flat-square&logo=pytest&logoColor=white)](backend/tests)
 [![Frontend Tests](https://img.shields.io/badge/Vitest-13%20Passed-6e9f18?style=flat-square&logo=vitest&logoColor=white)](frontend/src/pages/auth/__tests__)
 [![TypeScript Build](https://img.shields.io/badge/TypeScript-Strict_Clean-3178c6?style=flat-square&logo=typescript&logoColor=white)](frontend)
 [![Python](https://img.shields.io/badge/Python-3.10%2B_%7C_3.13-3776ab?style=flat-square&logo=python&logoColor=white)](backend)

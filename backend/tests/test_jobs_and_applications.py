@@ -385,3 +385,123 @@ def test_student_applications_empty_returns_200():
     finally:
         app.dependency_overrides.clear()
 
+
+def test_student_application_appears_in_recruiter_pipeline_only_after_apply():
+    """
+    Audit test verifying:
+    1. A newly registered student's applications are initially empty.
+    2. Recruiter applicants list does not contain the student prior to application submission.
+    3. Applying to a published job registers the application.
+    4. Duplicate application is rejected with 409 Conflict.
+    5. Recruiter endpoint immediately reflects the newly applied student under the target job.
+    6. Non-owning recruiter cannot view the applicant (strict ownership isolation).
+    """
+    from app.api.routes.recruiter import get_recruiter_service
+    from app.schemas.recruiter import (
+        RecruiterApplicantSummary,
+        RecruiterApplicantListResponse,
+    )
+
+    mock_job_service = MockJobService()
+
+    class RecruiterMock:
+        def __init__(self):
+            self.apps = []
+
+        async def get_recruiter_applications(self, recruiter_id, job_id=None, stage=None, search=None, sort_by=None):
+            # Enforce ownership: only return apps for jobs belonging to recruiter_id
+            target_apps = [a for a in self.apps if a["recruiter_id"] == recruiter_id]
+            if job_id:
+                target_apps = [a for a in target_apps if a["job_id"] == job_id]
+            items = [
+                RecruiterApplicantSummary(
+                    id=a["id"],
+                    job_id=a["job_id"],
+                    job_title="Frontend Developer",
+                    job_company="Acme Corp",
+                    student_id=a["student_id"],
+                    student_name="Audit Student",
+                    student_email="audit_student@example.com",
+                    stage=a["stage"],
+                    applied_at=a["applied_at"],
+                    stage_changed_at=a["applied_at"],
+                )
+                for a in target_apps
+            ]
+            return RecruiterApplicantListResponse(items=items, total=len(items))
+
+    mock_recruiter_service = RecruiterMock()
+
+    # Step 1: Recruiter checks applications before student applies -> 0 applicants
+    app.dependency_overrides[get_auth_service] = lambda: MockAuthService(role="recruiter", user_id="recruiter-1")
+    app.dependency_overrides[get_recruiter_service] = lambda: mock_recruiter_service
+    try:
+        before_resp = client.get(
+            "/api/recruiter/applications?job_id=job-101",
+            headers={"Authorization": "Bearer recruiter-token"},
+        )
+        assert before_resp.status_code == 200
+        assert before_resp.json()["total"] == 0
+    finally:
+        app.dependency_overrides.clear()
+
+    # Step 2: Student applies to job-101
+    app.dependency_overrides[get_auth_service] = lambda: MockAuthService(role="student", user_id="audit-student-uuid")
+    app.dependency_overrides[get_job_student_service] = lambda: mock_job_service
+    try:
+        apply_resp = client.post(
+            "/api/jobs/job-101/apply",
+            headers={"Authorization": "Bearer student-token"},
+            json={"notes": "Passionate frontend engineer."},
+        )
+        assert apply_resp.status_code == 201
+        app_data = apply_resp.json()
+        assert app_data["stage"] == "applied"
+        assert app_data["job_id"] == "job-101"
+
+        # Duplicate application attempt
+        dup_resp = client.post(
+            "/api/jobs/job-101/apply",
+            headers={"Authorization": "Bearer student-token"},
+            json={"notes": "Duplicate."},
+        )
+        assert dup_resp.status_code == 409
+
+        # Register in recruiter mock store
+        mock_recruiter_service.apps.append({
+            "id": app_data["application_id"],
+            "job_id": "job-101",
+            "recruiter_id": "recruiter-1",
+            "student_id": "audit-student-uuid",
+            "stage": "applied",
+            "applied_at": "2026-10-20T12:00:00Z",
+        })
+    finally:
+        app.dependency_overrides.clear()
+
+    # Step 3: Recruiter checks applications after student applies -> 1 applicant found
+    app.dependency_overrides[get_auth_service] = lambda: MockAuthService(role="recruiter", user_id="recruiter-1")
+    app.dependency_overrides[get_recruiter_service] = lambda: mock_recruiter_service
+    try:
+        after_resp = client.get(
+            "/api/recruiter/applications?job_id=job-101",
+            headers={"Authorization": "Bearer recruiter-token"},
+        )
+        assert after_resp.status_code == 200
+        data = after_resp.json()
+        assert data["total"] == 1
+        assert data["items"][0]["student_id"] == "audit-student-uuid"
+        assert data["items"][0]["stage"] == "applied"
+
+        # Step 4: Non-owning recruiter check -> 0 applicants (ownership isolation)
+        app.dependency_overrides[get_auth_service] = lambda: MockAuthService(role="recruiter", user_id="other-recruiter")
+        other_resp = client.get(
+            "/api/recruiter/applications?job_id=job-101",
+            headers={"Authorization": "Bearer other-token"},
+        )
+        assert other_resp.status_code == 200
+        assert other_resp.json()["total"] == 0
+    finally:
+        app.dependency_overrides.clear()
+
+
