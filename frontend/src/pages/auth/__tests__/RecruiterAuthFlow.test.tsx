@@ -32,6 +32,7 @@ describe('Recruiter Role Validation & Dashboard Access Regressions', () => {
       signInStudent: vi.fn(),
       signUpStudent: vi.fn(),
       signInRecruiter: mockSignInRecruiter,
+      signInDemoRecruiter: vi.fn(),
       signOut: vi.fn(),
       resetPassword: vi.fn(),
       clearError: vi.fn(),
@@ -83,6 +84,7 @@ describe('Recruiter Role Validation & Dashboard Access Regressions', () => {
       signInStudent: vi.fn(),
       signUpStudent: vi.fn(),
       signInRecruiter: mockSignInRecruiter,
+      signInDemoRecruiter: vi.fn(),
       signOut: vi.fn(),
       resetPassword: vi.fn(),
       clearError: vi.fn(),
@@ -130,6 +132,7 @@ describe('Recruiter Role Validation & Dashboard Access Regressions', () => {
       signInStudent: vi.fn(),
       signUpStudent: vi.fn(),
       signInRecruiter: vi.fn(),
+      signInDemoRecruiter: vi.fn(),
       signOut: vi.fn(),
       resetPassword: vi.fn(),
       clearError: vi.fn(),
@@ -172,6 +175,7 @@ describe('Recruiter Role Validation & Dashboard Access Regressions', () => {
       signInStudent: vi.fn(),
       signUpStudent: vi.fn(),
       signInRecruiter: vi.fn(),
+      signInDemoRecruiter: vi.fn(),
       signOut: vi.fn(),
       resetPassword: vi.fn(),
       clearError: vi.fn(),
@@ -204,6 +208,7 @@ describe('Recruiter Role Validation & Dashboard Access Regressions', () => {
       signInStudent: vi.fn(),
       signUpStudent: vi.fn(),
       signInRecruiter: mockSignInRecruiter,
+      signInDemoRecruiter: vi.fn(),
       signOut: vi.fn(),
       resetPassword: vi.fn(),
       clearError: vi.fn(),
@@ -223,4 +228,89 @@ describe('Recruiter Role Validation & Dashboard Access Regressions', () => {
     ).toBeInTheDocument();
     expect(mockSignInRecruiter).not.toHaveBeenCalled();
   });
+
+  it('6. One-click Continue as Demo Recruiter authenticates and redirects to /recruiter/dashboard', async () => {
+    const mockSignInDemoRecruiter = vi.fn().mockResolvedValue(undefined);
+
+    vi.spyOn(authHook, 'useAuth').mockReturnValue({
+      user: null,
+      profile: null,
+      session: null,
+      loading: false,
+      error: null,
+      signInStudent: vi.fn(),
+      signUpStudent: vi.fn(),
+      signInRecruiter: vi.fn(),
+      signInDemoRecruiter: mockSignInDemoRecruiter,
+      signOut: vi.fn(),
+      resetPassword: vi.fn(),
+      clearError: vi.fn(),
+      refreshProfile: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/recruiter/login']}>
+        <RecruiterLoginPage />
+      </MemoryRouter>
+    );
+
+    // Verify supporting text is displayed
+    expect(
+      screen.getByText(/Evaluating HireFlow\? Continue directly to the recruiter demo\./i)
+    ).toBeInTheDocument();
+
+    // Click Continue as Demo Recruiter button
+    const demoButton = screen.getByRole('button', { name: /Continue as Demo Recruiter/i });
+    expect(demoButton).toBeInTheDocument();
+    fireEvent.click(demoButton);
+
+    await waitFor(() => {
+      expect(mockSignInDemoRecruiter).toHaveBeenCalledTimes(1);
+    });
+
+    // Verify redirection to recruiter dashboard
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/recruiter/dashboard', { replace: true });
+    });
+  });
+
+  it('7. Error during one-click demo login renders clear error notice and does not redirect', async () => {
+    const mockSignInDemoRecruiter = vi.fn().mockRejectedValue(
+      new Error('Unable to establish demo recruiter session. Please verify server configuration.')
+    );
+
+    vi.spyOn(authHook, 'useAuth').mockReturnValue({
+      user: null,
+      profile: null,
+      session: null,
+      loading: false,
+      error: null,
+      signInStudent: vi.fn(),
+      signUpStudent: vi.fn(),
+      signInRecruiter: vi.fn(),
+      signInDemoRecruiter: mockSignInDemoRecruiter,
+      signOut: vi.fn(),
+      resetPassword: vi.fn(),
+      clearError: vi.fn(),
+      refreshProfile: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/recruiter/login']}>
+        <RecruiterLoginPage />
+      </MemoryRouter>
+    );
+
+    const demoButton = screen.getByRole('button', { name: /Continue as Demo Recruiter/i });
+    fireEvent.click(demoButton);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Unable to establish demo recruiter session/i)
+      ).toBeInTheDocument();
+    });
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
 });
+

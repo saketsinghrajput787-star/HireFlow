@@ -3,7 +3,8 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.api.deps import get_auth_service
 from app.services.supabase_auth import SupabaseAuthService
-from app.schemas.auth import UserProfileResponse
+from app.schemas.auth import UserProfileResponse, DemoRecruiterLoginResponse
+from app.core.config import settings
 from app.core.security import AuthError
 
 client = TestClient(app)
@@ -39,6 +40,27 @@ class MockAuthService(SupabaseAuthService):
             role=self.mock_role,
             created_at="2026-10-17T00:00:00Z"
         )
+
+    async def authenticate_demo_recruiter(self) -> DemoRecruiterLoginResponse:
+        if not settings.DEMO_LOGIN_ENABLED:
+            raise AuthError("Demo recruiter login is currently disabled.", 403)
+        if self.mock_role != "recruiter":
+            raise AuthError(f"Security violation: Configured demo account does not possess the recruiter role (role: {self.mock_role}).", 403)
+        return DemoRecruiterLoginResponse(
+            access_token="mock-demo-recruiter-access-jwt",
+            refresh_token="mock-demo-recruiter-refresh-jwt",
+            token_type="bearer",
+            expires_in=3600,
+            user={"id": "d1d8b2c7-c192-4224-a0b5-fb40dd9fde94", "email": "saket77@gmail.com"},
+            profile=UserProfileResponse(
+                id="d1d8b2c7-c192-4224-a0b5-fb40dd9fde94",
+                email="saket77@gmail.com",
+                full_name="Saket Recruiter",
+                role="recruiter",
+                created_at="2026-10-18T00:00:00Z"
+            )
+        )
+
 
 
 def test_api_me_missing_token():
@@ -276,6 +298,83 @@ def test_recruiter_endpoints_rejected_for_student():
         assert response_applicants.status_code == 403
     finally:
         app.dependency_overrides.clear()
+
+
+def test_demo_recruiter_login_success():
+    """
+    POST /api/auth/demo-recruiter-login returns 200 OK with session tokens
+    and verified recruiter profile.
+    """
+    app.dependency_overrides[get_auth_service] = lambda: MockAuthService(mock_role="recruiter")
+    try:
+        response = client.post("/api/auth/demo-recruiter-login")
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert "refresh_token" in data
+        assert data["token_type"] == "bearer"
+        assert data["profile"]["role"] == "recruiter"
+        assert data["profile"]["email"] == "saket77@gmail.com"
+        assert data["user"]["id"] == "d1d8b2c7-c192-4224-a0b5-fb40dd9fde94"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_demo_recruiter_login_rejected_for_non_recruiter_role():
+    """
+    POST /api/auth/demo-recruiter-login strictly rejects any account
+    whose authoritative role is not 'recruiter' with 403 Forbidden.
+    """
+    app.dependency_overrides[get_auth_service] = lambda: MockAuthService(mock_role="student")
+    try:
+        response = client.post("/api/auth/demo-recruiter-login")
+        assert response.status_code == 403
+        data = response.json()
+        assert "Security violation" in data["detail"] or "Access denied" in data["detail"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_demo_recruiter_login_rate_limiting():
+    """
+    POST /api/auth/demo-recruiter-login triggers HTTP 429 Too Many Requests
+    when rate limit threshold is exceeded within the sliding window.
+    """
+    from app.api.routes.auth import _demo_login_attempts
+    _demo_login_attempts.clear()
+
+    app.dependency_overrides[get_auth_service] = lambda: MockAuthService(mock_role="recruiter")
+    try:
+        limit = settings.DEMO_LOGIN_RATE_LIMIT_PER_MINUTE
+        # Exhaust the limit
+        for _ in range(limit):
+            resp = client.post("/api/auth/demo-recruiter-login")
+            assert resp.status_code == 200
+
+        # Next call exceeds rate limit
+        blocked_resp = client.post("/api/auth/demo-recruiter-login")
+        assert blocked_resp.status_code == 429
+        assert "Too many demo login attempts" in blocked_resp.json()["detail"]
+    finally:
+        _demo_login_attempts.clear()
+        app.dependency_overrides.clear()
+
+
+def test_demo_recruiter_login_disabled():
+    """
+    POST /api/auth/demo-recruiter-login returns 403 Forbidden when DEMO_LOGIN_ENABLED is False.
+    """
+    original_enabled = settings.DEMO_LOGIN_ENABLED
+    try:
+        settings.DEMO_LOGIN_ENABLED = False
+        app.dependency_overrides[get_auth_service] = lambda: MockAuthService(mock_role="recruiter")
+        response = client.post("/api/auth/demo-recruiter-login")
+        assert response.status_code == 403
+        assert "disabled" in response.json()["detail"]
+    finally:
+        settings.DEMO_LOGIN_ENABLED = original_enabled
+        app.dependency_overrides.clear()
+
 
 
 

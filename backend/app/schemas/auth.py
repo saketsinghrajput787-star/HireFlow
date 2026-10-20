@@ -16,3 +16,13 @@ class UserProfileResponse(BaseModel):
 class ErrorDetail(BaseModel):
     detail: str = Field(..., description="Human-readable error description")
     code: Optional[str] = Field(default=None, description="Internal error code")
+
+
+class DemoRecruiterLoginResponse(BaseModel):
+    access_token: str = Field(..., description="Supabase Auth access JWT")
+    refresh_token: str = Field(..., description="Supabase Auth refresh token")
+    token_type: str = Field(default="bearer", description="Token type")
+    expires_in: int = Field(default=3600, description="Token lifetime in seconds")
+    user: dict = Field(..., description="Supabase Auth user object")
+    profile: UserProfileResponse = Field(..., description="Authoritative database profile and role")
+

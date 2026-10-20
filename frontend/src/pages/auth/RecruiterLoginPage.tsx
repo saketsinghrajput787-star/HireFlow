@@ -2,15 +2,16 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Alert } from '../../components/Alert';
-import { Briefcase, ArrowRight, Loader2, Lock, Mail, ShieldAlert, GraduationCap, User } from 'lucide-react';
+import { Briefcase, ArrowRight, Loader2, Lock, Mail, ShieldAlert, GraduationCap, User, Sparkles } from 'lucide-react';
 
 export const RecruiterLoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [demoSubmitting, setDemoSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const { signInRecruiter, error, clearError, session, profile, signOut } = useAuth();
+  const { signInRecruiter, signInDemoRecruiter, error, clearError, session, profile, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -22,6 +23,22 @@ export const RecruiterLoginPage: React.FC = () => {
     !rawFrom.includes('/login')
       ? rawFrom
       : '/recruiter/dashboard';
+
+  const handleDemoLogin = async () => {
+    setLocalError(null);
+    clearError();
+    setDemoSubmitting(true);
+    try {
+      await signInDemoRecruiter();
+      navigate(targetPath, { replace: true });
+    } catch (err: any) {
+      setLocalError(
+        err.message || 'Demo recruiter authentication failed. Please try again or use enterprise credentials.'
+      );
+    } finally {
+      setDemoSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,6 +166,49 @@ export const RecruiterLoginPage: React.FC = () => {
               Student Portal
             </Link>
             . Public signup is disabled for recruiters.
+          </div>
+        </div>
+
+        {/* Evaluator Demo Recruiter Access */}
+        <div className="bg-gradient-to-br from-indigo-50/90 to-slate-50 border border-indigo-100 p-4 rounded-xl shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-100/70 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-indigo-600" />
+              Evaluator Demo
+            </span>
+            <span className="text-[11px] text-slate-500 font-medium">Pre-Configured Access</span>
+          </div>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Evaluating HireFlow? Continue directly to the recruiter demo.
+          </p>
+          <button
+            type="button"
+            id="demo-recruiter-login-btn"
+            onClick={handleDemoLogin}
+            disabled={submitting || demoSubmitting}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 shadow-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed group cursor-pointer"
+          >
+            {demoSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                Authenticating Demo Recruiter...
+              </>
+            ) : (
+              <>
+                Continue as Demo Recruiter <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+              </>
+            )}
+          </button>
+        </div>
+
+        <div className="relative my-2">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-slate-200" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-2.5 text-slate-400 font-medium tracking-wider">
+              Or sign in with enterprise credentials
+            </span>
           </div>
         </div>
 

@@ -19,6 +19,7 @@ interface AuthContextType {
   signInStudent: (email: string, password: string) => Promise<void>;
   signUpStudent: (email: string, password: string, fullName: string) => Promise<SignUpResult>;
   signInRecruiter: (email: string, password: string) => Promise<void>;
+  signInDemoRecruiter: () => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   clearError: () => void;
@@ -505,6 +506,80 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   /**
+   * One-Click Evaluator Demo Recruiter Login
+   * Requests server-side authenticated session for the pre-provisioned demo recruiter account.
+   * Sets session in Supabase client and verifies authoritative recruiter role.
+   */
+  const signInDemoRecruiter = async () => {
+    setError(null);
+    setLoading(true);
+    isAuthenticatingRef.current = true;
+    try {
+      if (!isSupabaseConfigured) {
+        throw new Error('Supabase credentials are not configured. Please update your environment variables.');
+      }
+
+      // Request server-side authenticated demo session
+      const demoData = await api.demoRecruiterLogin();
+      if (!demoData || !demoData.access_token) {
+        throw new Error('Failed to retrieve authentication session from demo recruiter service.');
+      }
+
+      // Establish session in Supabase client
+      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+        access_token: demoData.access_token,
+        refresh_token: demoData.refresh_token,
+      });
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      const activeSession = sessionData.session || {
+        access_token: demoData.access_token,
+        refresh_token: demoData.refresh_token,
+        user: demoData.user,
+      };
+      const activeUser = sessionData.user || demoData.user;
+
+      // Authoritative role validation
+      let authProfile: UserProfile = demoData.profile;
+      try {
+        authProfile = await api.checkRecruiterAccess(activeSession.access_token);
+      } catch (chkErr: any) {
+        if (!authProfile || authProfile.role !== 'recruiter') {
+          authProfile = await loadAuthoritativeProfile(activeSession.access_token, activeUser);
+        }
+      }
+
+      // Strict role verification
+      if (authProfile.role !== 'recruiter' && authProfile.role !== 'admin') {
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        const unauthorizedMsg = 'Access denied: Demo account is not authorized as a recruiter.';
+        setError(unauthorizedMsg);
+        throw new Error(unauthorizedMsg);
+      }
+
+      setSession(activeSession);
+      setUser(activeUser);
+      setProfile(authProfile);
+    } catch (err: any) {
+      console.error('Demo recruiter login failed:', err);
+      const friendlyMessage =
+        err.message || 'Unable to authenticate as demo recruiter. Please try again or use manual credentials.';
+      setError(friendlyMessage);
+      throw err;
+    } finally {
+      isAuthenticatingRef.current = false;
+      setLoading(false);
+    }
+  };
+
+
+  /**
    * Sign Out
    */
   const signOut = async () => {
@@ -560,6 +635,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         signInStudent,
         signUpStudent,
         signInRecruiter,
+        signInDemoRecruiter,
         signOut,
         resetPassword,
         clearError,

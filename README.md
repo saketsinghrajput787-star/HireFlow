@@ -13,8 +13,8 @@
 
 <br/>
 
-[![Backend Tests](https://img.shields.io/badge/Pytest-70%20Passed-2ea44f?style=flat-square&logo=pytest&logoColor=white)](backend/tests)
-[![Frontend Tests](https://img.shields.io/badge/Vitest-11%20Passed-6e9f18?style=flat-square&logo=vitest&logoColor=white)](frontend/src/pages/auth/__tests__)
+[![Backend Tests](https://img.shields.io/badge/Pytest-74%20Passed-2ea44f?style=flat-square&logo=pytest&logoColor=white)](backend/tests)
+[![Frontend Tests](https://img.shields.io/badge/Vitest-13%20Passed-6e9f18?style=flat-square&logo=vitest&logoColor=white)](frontend/src/pages/auth/__tests__)
 [![TypeScript Build](https://img.shields.io/badge/TypeScript-Strict_Clean-3178c6?style=flat-square&logo=typescript&logoColor=white)](frontend)
 [![Python](https://img.shields.io/badge/Python-3.10%2B_%7C_3.13-3776ab?style=flat-square&logo=python&logoColor=white)](backend)
 [![React](https://img.shields.io/badge/React-18.3-61dafb?style=flat-square&logo=react&logoColor=black)](frontend)
@@ -78,20 +78,25 @@ HireFlow is configured and deployed for evaluator testing. Both the **Student** 
 
 ---
 
-### 🔑 Demo Recruiter Credentials
+### 🔑 Demo Recruiter Access (One-Click Instant Access)
 
-> [!IMPORTANT]
-> The recruiter role grants full pipeline and job management access. Public self-service signup for recruiters is strictly disabled in HireFlow. The demo account below has been pre-provisioned via administrative database script ([`database/provision_recruiter.sql`](database/provision_recruiter.sql)) and verified in production.
+> [!TIP]
+> **No Manual Typing Required**: Evaluators can access the recruiter portal instantly by clicking the prominent **Continue as Demo Recruiter →** button on the [Recruiter Portal Sign-In page](https://hire-flow-beryl-one.vercel.app/recruiter/login).
 
 - **Portal URL**: [https://hire-flow-beryl-one.vercel.app/recruiter/login](https://hire-flow-beryl-one.vercel.app/recruiter/login)
-- **Enterprise Email**: `saket77@gmail.com`
-- **Demo Password**: `Saket7@#`
+- **One-Click Button**: **Continue as Demo Recruiter →** (authenticates through server-side Supabase credentials and redirects directly to `/recruiter/dashboard`).
+- **Configured Recruiter Account**: `saket77@gmail.com`
+- **Manual Password (Fallback)**: `Saket7@#`
 - **Authoritative Role**: `recruiter`
 - **Profile Name**: Saket Recruiter
 - **Assigned Recruiter ID**: `d1d8b2c7-c192-4224-a0b5-fb40dd9fde94`
 
-> [!NOTE]
-> This password is provided specifically for evaluator demonstration and grading. For security hygiene, credential rotation is recommended after evaluation.
+#### Security Architecture of One-Click Demo Login
+1. **Server-Side Authentication**: The client does not store or embed passwords or service-role keys. The request is sent to `POST /api/auth/demo-recruiter-login`.
+2. **Fixed Account Binding**: The backend exclusively provisions a session for `saket77@gmail.com` (cannot authenticate arbitrary accounts).
+3. **Authoritative Role Gating**: Before returning session tokens, the backend queries `public.profiles` to cryptographically verify the user's role is strictly `recruiter`.
+4. **Rate Limiting**: Protected by an in-memory sliding window rate limiter (15 requests/minute per client IP) returning HTTP 429 upon abuse.
+5. **Supabase Client Session Storage**: The client establishes the session via `supabase.auth.setSession(...)`, activating seamless token refresh and RLS policies.
 
 ---
 
@@ -118,12 +123,13 @@ sequenceDiagram
     participant Backend as Render FastAPI
     participant DB as Supabase (PostgreSQL + RLS)
 
-    Note over Evaluator,DB: Recruiter Flow
-    Evaluator->>Frontend: Visit /recruiter/login & submit credentials
-    Frontend->>DB: Supabase Auth (saket77@gmail.com)
-    Frontend->>Backend: GET /api/recruiter-check (with Bearer JWT)
-    Backend->>DB: Query authoritative public.profiles
-    Backend-->>Frontend: 200 OK (role: "recruiter")
+    Note over Evaluator,DB: One-Click Recruiter Demo Flow
+    Evaluator->>Frontend: Click "Continue as Demo Recruiter →"
+    Frontend->>Backend: POST /api/auth/demo-recruiter-login
+    Backend->>DB: Server-side Supabase authentication (saket77@gmail.com)
+    Backend->>DB: Verify public.profiles role == "recruiter"
+    Backend-->>Frontend: 200 OK (access_token, refresh_token, profile)
+    Frontend->>Frontend: supabase.auth.setSession(access_token)
     Frontend-->>Evaluator: Redirect to /recruiter/dashboard
 
     Note over Evaluator,DB: Role Boundary Verification
@@ -133,11 +139,12 @@ sequenceDiagram
     Frontend-->>Evaluator: Immediate session termination & friendly portal switch banner
 ```
 
-1. **Verify Recruiter Sign-In & Dashboard Access**:
+1. **Verify One-Click Recruiter Access & Dashboard**:
    - Go to [https://hire-flow-beryl-one.vercel.app/recruiter/login](https://hire-flow-beryl-one.vercel.app/recruiter/login).
-   - Enter `saket77@gmail.com` and `Saket7@#`.
-   - Click **Sign In as Recruiter**.
-   - Confirm automatic redirection to `/recruiter/dashboard` displaying aggregate metrics (active jobs, total applicants, stage distribution, and recent applications).
+   - Under the notice, locate the **Continue as Demo Recruiter →** button.
+   - Click the button; observe the loading spinner while server authentication proceeds.
+   - Confirm automatic redirection to `/recruiter/dashboard` with aggregate metrics (active jobs, total applicants, stage distribution, and recent applications).
+   - Alternatively, test manual entry using `saket77@gmail.com` and `Saket7@#` in the form below.
 2. **Verify Job Management**:
    - Navigate to `/recruiter/jobs`.
    - Review pre-seeded opportunities owned by this recruiter account (*Software Developer*, *Frontend Engineer*, *Backend Engineer*, *AI Engineer*, *Full Stack Developer*).
@@ -170,6 +177,7 @@ sequenceDiagram
    Data modified during evaluation (new jobs created, applications moved through stages) persists live in Supabase PostgreSQL.
 3. **Safe Demo Data**:
    All candidates, jobs, resumes, and contacts in this deployment consist strictly of fictional, synthesized demonstration records.
+
 
 ---
 

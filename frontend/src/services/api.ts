@@ -125,6 +125,24 @@ export const api = {
     return handleResponse<UserProfile>(response);
   },
 
+  async demoRecruiterLogin(): Promise<{
+    access_token: string;
+    refresh_token: string;
+    token_type: string;
+    expires_in: number;
+    user: any;
+    profile: UserProfile;
+  }> {
+    const response = await safeFetch(`${API_BASE_URL}/api/auth/demo-recruiter-login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    return handleResponse(response);
+  },
+
+
   // =========================================================================
   // Student Profile & Resume
   // =========================================================================

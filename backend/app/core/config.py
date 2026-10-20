@@ -35,6 +35,24 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
+    # Demo Recruiter Evaluator Configuration
+    DEMO_RECRUITER_EMAIL: str = Field(
+        default="saket77@gmail.com",
+        description="Designated pre-provisioned demo recruiter account email"
+    )
+    DEMO_RECRUITER_PASSWORD: Optional[str] = Field(
+        default="Saket7@#",
+        description="Demo recruiter account password for server-side authentication"
+    )
+    DEMO_LOGIN_ENABLED: bool = Field(
+        default=True,
+        description="Enable one-click demo recruiter login endpoint"
+    )
+    DEMO_LOGIN_RATE_LIMIT_PER_MINUTE: int = Field(
+        default=15,
+        description="Maximum demo login requests per minute per IP"
+    )
+
     @property
     def cors_origins_list(self) -> List[str]:
         return [origin.strip().rstrip('/') for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
