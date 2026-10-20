@@ -13,8 +13,8 @@
 
 <br/>
 
-[![Backend Tests](https://img.shields.io/badge/Pytest-69%20Passed-2ea44f?style=flat-square&logo=pytest&logoColor=white)](backend/tests)
-[![Frontend Tests](https://img.shields.io/badge/Vitest-6%20Passed-6e9f18?style=flat-square&logo=vitest&logoColor=white)](frontend/src/pages/auth/__tests__)
+[![Backend Tests](https://img.shields.io/badge/Pytest-70%20Passed-2ea44f?style=flat-square&logo=pytest&logoColor=white)](backend/tests)
+[![Frontend Tests](https://img.shields.io/badge/Vitest-11%20Passed-6e9f18?style=flat-square&logo=vitest&logoColor=white)](frontend/src/pages/auth/__tests__)
 [![TypeScript Build](https://img.shields.io/badge/TypeScript-Strict_Clean-3178c6?style=flat-square&logo=typescript&logoColor=white)](frontend)
 [![Python](https://img.shields.io/badge/Python-3.10%2B_%7C_3.13-3776ab?style=flat-square&logo=python&logoColor=white)](backend)
 [![React](https://img.shields.io/badge/React-18.3-61dafb?style=flat-square&logo=react&logoColor=black)](frontend)
@@ -34,6 +34,7 @@
 
 ## 📑 Table of Contents
 
+- [Evaluator Demo Account & Testing Guide](#-evaluator-demo-account--testing-guide)
 - [Overview](#-overview)
 - [Problem & Solution](#-problem--solution)
 - [Key Features](#-key-features)
@@ -58,6 +59,117 @@
 - [Repository Structure](#-repository-structure)
 - [Contributing](#-contributing)
 - [License](#-license)
+
+## 🚀 Evaluator Demo Account & Testing Guide
+
+HireFlow is configured and deployed for evaluator testing. Both the **Student** and **Recruiter** portals can be tested independently with zero cross-role contamination.
+
+### 🌐 Live Deployment Endpoints
+
+| Portal / Service | Environment | Provider | URL |
+| :--- | :--- | :--- | :--- |
+| **Frontend Application** | Production | Vercel | [https://hire-flow-beryl-one.vercel.app](https://hire-flow-beryl-one.vercel.app/) |
+| **Recruiter Portal Sign-In** | Production | Vercel | [https://hire-flow-beryl-one.vercel.app/recruiter/login](https://hire-flow-beryl-one.vercel.app/recruiter/login) |
+| **Student Portal Sign-In** | Production | Vercel | [https://hire-flow-beryl-one.vercel.app/student/login](https://hire-flow-beryl-one.vercel.app/student/login) |
+| **Student Self-Registration** | Production | Vercel | [https://hire-flow-beryl-one.vercel.app/student/signup](https://hire-flow-beryl-one.vercel.app/student/signup) |
+| **Backend API Base** | Production | Render | [https://hireflow-giet.onrender.com](https://hireflow-giet.onrender.com/) |
+| **API Health Check** | Production | Render | [https://hireflow-giet.onrender.com/health](https://hireflow-giet.onrender.com/health) |
+| **Swagger OpenAPI Docs** | Production | Render | [https://hireflow-giet.onrender.com/docs](https://hireflow-giet.onrender.com/docs) |
+
+---
+
+### 🔑 Demo Recruiter Credentials
+
+> [!IMPORTANT]
+> The recruiter role grants full pipeline and job management access. Public self-service signup for recruiters is strictly disabled in HireFlow. The demo account below has been pre-provisioned via administrative database script ([`database/provision_recruiter.sql`](database/provision_recruiter.sql)) and verified in production.
+
+- **Portal URL**: [https://hire-flow-beryl-one.vercel.app/recruiter/login](https://hire-flow-beryl-one.vercel.app/recruiter/login)
+- **Enterprise Email**: `saket77@gmail.com`
+- **Demo Password**: `Saket7@#`
+- **Authoritative Role**: `recruiter`
+- **Profile Name**: Saket Recruiter
+- **Assigned Recruiter ID**: `d1d8b2c7-c192-4224-a0b5-fb40dd9fde94`
+
+> [!NOTE]
+> This password is provided specifically for evaluator demonstration and grading. For security hygiene, credential rotation is recommended after evaluation.
+
+---
+
+### 🎓 Student Portal Testing (Independent Testing)
+
+- **Student Login**: [https://hire-flow-beryl-one.vercel.app/student/login](https://hire-flow-beryl-one.vercel.app/student/login)
+- **Student Signup**: [https://hire-flow-beryl-one.vercel.app/student/signup](https://hire-flow-beryl-one.vercel.app/student/signup)
+- **Testing Approach**: Evaluators can register a new student account using any valid email format and password.
+- **Student Capabilities to Test**:
+  1. Complete candidate profile details (headline, location, graduation year, technical skills) at `/student/profile`.
+  2. Upload a PDF resume to the private vault and test in-house resume extraction at `/student/resume-analysis`.
+  3. Browse published openings at `/student/jobs`, view deterministic match scorecards, and submit an application.
+  4. Track status updates and interview notifications at `/student/applications` and `/student/notifications`.
+
+---
+
+### 🧪 Step-by-Step Evaluator Verification Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Evaluator
+    participant Frontend as Vercel Frontend
+    participant Backend as Render FastAPI
+    participant DB as Supabase (PostgreSQL + RLS)
+
+    Note over Evaluator,DB: Recruiter Flow
+    Evaluator->>Frontend: Visit /recruiter/login & submit credentials
+    Frontend->>DB: Supabase Auth (saket77@gmail.com)
+    Frontend->>Backend: GET /api/recruiter-check (with Bearer JWT)
+    Backend->>DB: Query authoritative public.profiles
+    Backend-->>Frontend: 200 OK (role: "recruiter")
+    Frontend-->>Evaluator: Redirect to /recruiter/dashboard
+
+    Note over Evaluator,DB: Role Boundary Verification
+    Evaluator->>Frontend: Attempt /student/login with recruiter credentials
+    Frontend->>Backend: GET /api/student-check
+    Backend-->>Frontend: 403 Forbidden ("This is a recruiter account")
+    Frontend-->>Evaluator: Immediate session termination & friendly portal switch banner
+```
+
+1. **Verify Recruiter Sign-In & Dashboard Access**:
+   - Go to [https://hire-flow-beryl-one.vercel.app/recruiter/login](https://hire-flow-beryl-one.vercel.app/recruiter/login).
+   - Enter `saket77@gmail.com` and `Saket7@#`.
+   - Click **Sign In as Recruiter**.
+   - Confirm automatic redirection to `/recruiter/dashboard` displaying aggregate metrics (active jobs, total applicants, stage distribution, and recent applications).
+2. **Verify Job Management**:
+   - Navigate to `/recruiter/jobs`.
+   - Review pre-seeded opportunities owned by this recruiter account (*Software Developer*, *Frontend Engineer*, *Backend Engineer*, *AI Engineer*, *Full Stack Developer*).
+   - Create a new job opening or edit requirements and verify that changes persist.
+3. **Verify Candidate Pipeline & Match Ratings**:
+   - Navigate to `/recruiter/applicants`.
+   - Inspect applicants who applied to your posted opportunities.
+   - Click on candidate cards to review candidate profile details, contact information, matched skills, and deterministic 0–100 match factors.
+4. **Verify Secure Resume Access**:
+   - From any candidate detail modal, click the **View Resume** button.
+   - Verify that the resume opens via a secure, time-limited signed Supabase Storage URL (300-second expiration).
+5. **Verify Interview Coordination & Stage Transitions**:
+   - Advance candidate stages (`applied` &rarr; `screening` &rarr; `interview` &rarr; `offer`).
+   - Navigate to `/recruiter/interviews` to schedule a candidate interview round with date, time, format, and meeting coordinates.
+6. **Verify Follow-up Intelligence & Reminders**:
+   - On the recruiter dashboard, inspect the **Follow-up Intelligence Center**.
+   - Review actionable items (e.g. unreviewed candidate applications, upcoming interviews).
+   - Trigger the automated reminder scan (`POST /api/recruiter/follow-ups/process-reminders`) directly from the dashboard to idempotently send in-app notifications to scheduled candidates.
+7. **Verify Role Isolation & Defense-in-Depth**:
+   - **Test Recruiter on Student Login**: Visit `/student/login` and attempt to sign in with `saket77@gmail.com`. The system immediately blocks access, signs out the session, and informs the user: *"This is a recruiter account. Please use Recruiter Login."*
+   - **Test Student on Recruiter Route**: When signed in as a student, navigate directly to `/recruiter/dashboard`. The route is blocked by `<ProtectedRoute>` displaying an **Access Restricted** screen with zero leakage of confidential recruiter data.
+
+---
+
+### ⚠️ Evaluator Notes & Cloud Service Considerations
+
+1. **Render Free-Tier Spin-Up (Cold Starts)**:
+   The backend API is hosted on Render's free tier. If no requests have been received within 15 minutes, Render spins down the service. The very first request (e.g. initial health check or login) may take **30 to 50 seconds** while the container starts. Subsequent requests respond within 150–250ms.
+2. **Shared Evaluation Environment**:
+   Data modified during evaluation (new jobs created, applications moved through stages) persists live in Supabase PostgreSQL.
+3. **Safe Demo Data**:
+   All candidates, jobs, resumes, and contacts in this deployment consist strictly of fictional, synthesized demonstration records.
 
 ---
 

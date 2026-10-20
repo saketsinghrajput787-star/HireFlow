@@ -585,3 +585,71 @@ async def test_real_recruiter_service_isolation_logic():
             await service.get_application_detail(other_recruiter, mock_app_id)
         assert exc_info.value.status_code == 403
         assert "Access denied" in exc_info.value.detail
+
+
+def test_evaluator_demo_recruiter_role_and_dashboard_regression():
+    """
+    Regression Test: Evaluator Demo Recruiter Role Validation & Dashboard Access.
+    Verifies that:
+    1. Authorized recruiter token accesses /api/recruiter-check and /api/recruiter/dashboard with 200 OK.
+    2. Recruiter profile ID strictly matches auth user ID.
+    3. Unauthorized student token is rejected with 403 Forbidden on recruiter endpoints.
+    4. Recruiter token is rejected with 403 Forbidden on student-only endpoints (/api/student-check).
+    """
+    demo_recruiter_id = "d1d8b2c7-c192-4224-a0b5-fb40dd9fde94"
+    mock_auth = MockAuthService(role="recruiter", user_id=demo_recruiter_id)
+    mock_recruiter = MockRecruiterService()
+    # Associate mock data with the demo recruiter ID
+    for j in mock_recruiter.jobs:
+        j.recruiter_id = demo_recruiter_id
+
+    app.dependency_overrides[get_auth_service] = lambda: mock_auth
+    app.dependency_overrides[get_recruiter_service] = lambda: mock_recruiter
+
+    try:
+        headers = {"Authorization": "Bearer valid-demo-recruiter-token"}
+
+        # 1. Recruiter role verification check
+        check_resp = client.get("/api/recruiter-check", headers=headers)
+        assert check_resp.status_code == 200
+        data = check_resp.json()
+        assert data["role"] == "recruiter"
+        assert data["id"] == demo_recruiter_id
+
+        # 2. Recruiter dashboard access
+        dash_resp = client.get("/api/recruiter/dashboard", headers=headers)
+        assert dash_resp.status_code == 200
+        stats = dash_resp.json()
+        assert stats["total_jobs"] == 1
+        assert stats["active_jobs"] == 1
+        assert stats["total_applicants"] == 1
+        assert "stage_distribution" in stats
+
+        # 3. Recruiter jobs list
+        jobs_resp = client.get("/api/recruiter/jobs", headers=headers)
+        assert jobs_resp.status_code == 200
+        assert jobs_resp.json()["total"] == 1
+
+        # 4. Cross-role boundary: Recruiter attempting student-check must receive 403 Forbidden
+        student_check_resp = client.get("/api/student-check", headers=headers)
+        assert student_check_resp.status_code == 403
+        assert "Access denied" in student_check_resp.json()["detail"]
+
+        # 5. Cross-role boundary: Student attempting recruiter endpoints must receive 403 Forbidden
+        student_auth = MockAuthService(role="student", user_id="student-uuid-12345")
+        app.dependency_overrides[get_auth_service] = lambda: student_auth
+
+        student_headers = {"Authorization": "Bearer student-token"}
+        rec_check_blocked = client.get("/api/recruiter-check", headers=student_headers)
+        assert rec_check_blocked.status_code == 403
+
+        dash_blocked = client.get("/api/recruiter/dashboard", headers=student_headers)
+        assert dash_blocked.status_code == 403
+        assert "Access denied" in dash_blocked.json()["detail"]
+
+        jobs_blocked = client.get("/api/recruiter/jobs", headers=student_headers)
+        assert jobs_blocked.status_code == 403
+
+    finally:
+        app.dependency_overrides.clear()
+
